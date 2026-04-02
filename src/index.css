@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #f1f5f9;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; display: block; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-orange-500 hover:bg-orange-600 active:bg-orange-700
+           text-white font-bold text-sm rounded-xl
+           transition-all duration-150 active:scale-95 cursor-pointer;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-white hover:bg-slate-50 active:bg-slate-100
+           text-slate-700 font-semibold text-sm rounded-xl
+           border border-slate-200 transition-all duration-150 active:scale-95 cursor-pointer;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-2
+           text-slate-600 hover:text-slate-900 hover:bg-slate-100
+           font-medium text-sm rounded-xl transition-all duration-150 cursor-pointer;
+  }
+  .card {
+    @apply bg-white rounded-2xl border border-slate-100 shadow-sm;
+  }
+  .input {
+    @apply w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl
+           text-slate-800 placeholder-slate-400 text-sm
+           focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent
+           transition-all duration-150;
+  }
+  .label {
+    @apply block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider;
+  }
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold;
+  }
+  .skeleton {
+    @apply bg-slate-200 animate-pulse rounded-lg;
+  }
+  .error-banner {
+    @apply flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl
+           text-red-700 text-sm;
+  }
+  .page-fade {
+    animation: pageFade 0.2s ease-out both;
+  }
+}
+
+@keyframes pageFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Thin scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }

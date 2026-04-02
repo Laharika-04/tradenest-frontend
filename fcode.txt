@@ -1,0 +1,4263 @@
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\postcss.config.js =====  
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\tailwind.config.js =====  
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,jsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [],
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\vite.config.js =====  
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path,
+      },
+      '/uploads': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
+})
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\App.jsx =====  
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
+import { AuthProvider }         from './context/AuthContext'
+import { WishlistProvider }     from './context/WishlistContext'
+import { NotificationProvider } from './context/NotificationContext'
+import MainLayout     from './layouts/MainLayout'
+import ProtectedRoute from './components/ProtectedRoute'
+
+import HomePage           from './pages/HomePage'
+import LoginPage          from './pages/LoginPage'
+import RegisterPage       from './pages/RegisterPage'
+import ProductDetailPage  from './pages/ProductDetailPage'
+import CategoryPage       from './pages/CategoryPage'
+import SearchPage         from './pages/SearchPage'
+import SellPage           from './pages/SellPage'
+import EditProductPage    from './pages/EditProductPage'
+import WishlistPage       from './pages/WishlistPage'
+import ChatPage           from './pages/ChatPage'
+import OffersPage         from './pages/OffersPage'
+import DashboardPage      from './pages/DashboardPage'
+import MyListingsPage     from './pages/MyListingsPage'
+import ProfilePage        from './pages/ProfilePage'
+import SellerProfilePage  from './pages/SellerProfilePage'
+import NotFoundPage       from './pages/NotFoundPage'
+
+export default function App() {
+  return (
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
+      <AuthProvider>
+        <WishlistProvider>
+          <NotificationProvider>
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                duration: 3000,
+                style: {
+                  background: '#0f172a',
+                  color: '#f8fafc',
+                  borderRadius: '12px',
+                  fontSize: '13px',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  padding: '10px 16px',
+                },
+                success: { iconTheme: { primary: '#f97316', secondary: '#fff' } },
+                error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+              }}
+            />
+            <Routes>
+              <Route element={<MainLayout />}>
+                <Route path="/"                  element={<HomePage />} />
+                <Route path="/search"            element={<SearchPage />} />
+                <Route path="/category/:slug"    element={<CategoryPage />} />
+                <Route path="/product/:id"       element={<ProductDetailPage />} />
+                <Route path="/seller/:id"        element={<SellerProfilePage />} />
+                <Route path="/login"             element={<LoginPage />} />
+                <Route path="/register"          element={<RegisterPage />} />
+
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/sell"            element={<SellPage />} />
+                  <Route path="/sell/edit/:id"   element={<EditProductPage />} />
+                  <Route path="/wishlist"        element={<WishlistPage />} />
+                  <Route path="/chat"            element={<ChatPage />} />
+                  <Route path="/offers"          element={<OffersPage />} />
+                  <Route path="/dashboard"       element={<DashboardPage />} />
+                  <Route path="/my-listings"     element={<MyListingsPage />} />
+                  <Route path="/profile"         element={<ProfilePage />} />
+                </Route>
+
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Routes>
+          </NotificationProvider>
+        </WishlistProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\main.jsx =====  
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\api\index.js =====  
+import axios from 'axios'
+
+const api = axios.create({
+  baseURL: '/api',
+  timeout: 20000,
+  headers: { 'Content-Type': 'application/json' },
+})
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('tn_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err.response?.status
+    const url    = err.config?.url || ''
+    if (status === 401 && !url.includes('/auth/')) {
+      localStorage.removeItem('tn_token')
+      localStorage.removeItem('tn_user')
+      window.dispatchEvent(new Event('tn:logout'))
+    }
+    return Promise.reject(err)
+  }
+)
+
+export const IMG_HOST = 'http://localhost:9000'
+
+export const getImageUrl = (raw) => {
+  if (!raw || raw === 'sample.jpg' || !raw.trim()) return null
+  const clean = raw.replace(/^\/uploads\//, '').trim()
+  if (!clean) return null
+  if (clean.startsWith('http')) return clean
+  return `${IMG_HOST}/uploads/${clean}`
+}
+
+export const getFirstImageUrl = (images) => {
+  if (!images || images === 'sample.jpg') return null
+  const first = images.split(',')[0].trim()
+  return getImageUrl(first)
+}
+
+export const CATEGORY_IMAGES = {
+  cars:         'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&q=75',
+  motorcycles:  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=75',
+  phones:       'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&q=75',
+  electronics:  'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=600&q=75',
+  furniture:    'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&q=75',
+  fashion:      'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&q=75',
+  books:        'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&q=75',
+  laptops:      'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=600&q=75',
+  pets:         'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600&q=75',
+  sports:       'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&q=75',
+  services:     'https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=600&q=75',
+  'real-estate':'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&q=75',
+  default:      'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=600&q=75',
+}
+
+export const getProductImage = (product) => {
+  const uploaded = getFirstImageUrl(product?.images)
+  if (uploaded) return uploaded
+  const slug = product?.categorySlug || product?.category?.slug || 'default'
+  return CATEGORY_IMAGES[slug] || CATEGORY_IMAGES.default
+}
+
+export const fmtPrice = (v) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency', currency: 'INR', maximumFractionDigits: 0,
+  }).format(Number(v) || 0)
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+export const authAPI = {
+  register:      (d) => api.post('/auth/register', d),
+  login:         (d) => api.post('/auth/login', d),
+  profile:       ()  => api.get('/auth/profile'),
+  updateProfile: (d) => api.put('/auth/profile', d),   // NEW
+}
+
+// ── Products ──────────────────────────────────────────────────────────────────
+export const productsAPI = {
+  getAll:      ()                => api.get('/products'),
+  getAllPaged:  (page = 0, size = 20) => api.get(`/products/paged?page=${page}&size=${size}`),  // NEW
+  getById:     (id)              => api.get(`/products/${id}`),
+  getFeatured: ()                => api.get('/products/featured'),
+  getMy:       ()                => api.get('/products/my'),
+  getBySeller: (uid)             => api.get(`/products/seller/${uid}`),
+  create:      (d)               => api.post('/products', d),
+  update:      (id, d)           => api.put(`/products/${id}`, d),
+  markAsSold:  (id)              => api.put(`/products/${id}/sold`),  // NEW
+  delete:      (id)              => api.delete(`/products/${id}`),
+
+  // NEW: backend search — all params optional
+  search: ({ q, city, category, minPrice, maxPrice, page = 0, size = 20 } = {}) => {
+    const params = new URLSearchParams()
+    if (q)        params.set('q', q)
+    if (city)     params.set('city', city)
+    if (category) params.set('category', category)
+    if (minPrice) params.set('minPrice', minPrice)
+    if (maxPrice) params.set('maxPrice', maxPrice)
+    params.set('page', page)
+    params.set('size', size)
+    return api.get(`/products/search?${params}`)
+  },
+
+  // NEW: products by category (paginated)
+  getByCategory: (slug, page = 0, size = 20) =>
+    api.get(`/products/category/${slug}?page=${page}&size=${size}`),
+}
+
+// ── Categories ────────────────────────────────────────────────────────────────
+export const categoriesAPI = {
+  getAll:    ()     => api.get('/categories'),
+  getBySlug: (slug) => api.get(`/categories/${slug}`),
+}
+
+// ── Cities ────────────────────────────────────────────────────────────────────
+export const citiesAPI = {
+  getAll:     ()      => api.get('/cities'),
+  getByState: (state) => api.get(`/cities/state/${state}`),
+}
+
+// ── Wishlist ──────────────────────────────────────────────────────────────────
+export const wishlistAPI = {
+  getAll: ()    => api.get('/wishlist'),
+  add:    (pid) => api.post(`/wishlist/${pid}`),
+  remove: (pid) => api.delete(`/wishlist/${pid}`),
+  check:  (pid) => api.get(`/wishlist/check/${pid}`),
+}
+
+// ── Messages ──────────────────────────────────────────────────────────────────
+export const messagesAPI = {
+  getConversations:  ()       => api.get('/messages/conversations'),
+  getMessages:       (id)     => api.get(`/messages/conversations/${id}`),
+  startConversation: (d)      => api.post('/messages/conversations', d),
+  sendMessage:       (id, d)  => api.post(`/messages/conversations/${id}`, d),
+  markRead:          (id)     => api.put(`/messages/conversations/${id}/read`),
+}
+
+// ── Offers ────────────────────────────────────────────────────────────────────
+export const offersAPI = {
+  make:        (d)     => api.post('/offers', d),
+  getMine:     ()      => api.get('/offers/mine'),
+  getReceived: ()      => api.get('/offers/received'),
+  accept:      (id)    => api.put(`/offers/${id}/accept`),
+  reject:      (id)    => api.put(`/offers/${id}/reject`),
+  counter:     (id, d) => api.put(`/offers/${id}/counter`, d),
+}
+
+// ── Reviews ───────────────────────────────────────────────────────────────────
+export const reviewsAPI = {
+  getBySeller: (sid) => api.get(`/reviews/${sid}`),
+  getStats:    (sid) => api.get(`/reviews/${sid}/stats`),
+  create:      (d)   => api.post('/reviews', d),
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+export const dashboardAPI = {
+  get: () => api.get('/dashboard'),
+}
+
+// ── Notifications (NEW) ───────────────────────────────────────────────────────
+export const notificationsAPI = {
+  getAll:       ()   => api.get('/notifications'),
+  getUnread:    ()   => api.get('/notifications/unread-count'),
+  markAllRead:  ()   => api.put('/notifications/mark-all-read'),
+  markOneRead:  (id) => api.put(`/notifications/${id}/read`),
+}
+
+// ── File upload ───────────────────────────────────────────────────────────────
+export const uploadFile = (file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post('/files/upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+export default api===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\components\ProductCard.jsx =====  
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Heart, MapPin, Clock, Eye } from 'lucide-react'
+import { useWishlist } from '../context/WishlistContext'
+import { getProductImage, CATEGORY_IMAGES, fmtPrice } from '../api'
+import { formatDistanceToNow } from 'date-fns'
+
+export default function ProductCard({ product }) {
+  const { isWishlisted, isToggling, toggle } = useWishlist()
+  const [imgFailed, setImgFailed] = useState(false)
+
+  const pid      = product.id
+  const liked    = isWishlisted(pid)
+  const toggling = isToggling(pid)
+
+  // ✅ getProductImage already reads product.categorySlug (flat DTO field)
+  const imgSrc = imgFailed
+    ? (CATEGORY_IMAGES[product.categorySlug] || CATEGORY_IMAGES.default)
+    : getProductImage(product)
+
+  const handleHeart = async e => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (toggling) return
+    await toggle(pid)
+  }
+
+  const when = product.postedDate
+    ? formatDistanceToNow(new Date(product.postedDate), { addSuffix: true })
+    : 'Recently'
+
+  return (
+    <Link to={`/product/${pid}`} className="block group outline-none">
+      <article className="card overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full flex flex-col">
+        {/* Image */}
+        <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden shrink-0">
+          <img
+            src={imgSrc}
+            alt={product.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={() => setImgFailed(true)}
+            loading="lazy"
+            crossOrigin="anonymous"
+          />
+          {product.featured && (
+            <span className="absolute top-2 left-2 badge bg-orange-500 text-white text-[9px]">
+              ⭐ Featured
+            </span>
+          )}
+          <button
+            onClick={handleHeart}
+            disabled={toggling}
+            className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all
+              ${toggling ? 'opacity-60 cursor-wait' : ''}
+              ${liked
+                ? 'bg-red-500 text-white'
+                : 'bg-white/90 text-slate-500 hover:text-red-500 hover:bg-white'
+              }`}
+          >
+            <Heart size={14} className={liked ? 'fill-white' : ''} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-3 flex flex-col flex-1">
+          <p className="font-black text-lg leading-tight text-slate-900">
+            {fmtPrice(product.price)}
+          </p>
+          <p className="text-sm font-medium text-slate-700 mt-0.5 line-clamp-1">
+            {product.title}
+          </p>
+          <div className="flex items-center justify-between mt-auto pt-2">
+            <span className="flex items-center gap-1 text-slate-400 text-xs">
+              <MapPin size={11} />
+              <span className="truncate max-w-[90px]">{product.city}</span>
+            </span>
+            <span className="flex items-center gap-1 text-slate-400 text-xs">
+              <Clock size={11} />{when}
+            </span>
+          </div>
+          {product.viewCount > 0 && (
+            <div className="flex items-center gap-1 text-slate-300 text-[10px] mt-1">
+              <Eye size={10} />{product.viewCount} views
+            </div>
+          )}
+        </div>
+      </article>
+    </Link>
+  )
+}
+
+export function ProductCardSkeleton() {
+  return (
+    <div className="card overflow-hidden">
+      <div className="aspect-[4/3] skeleton" />
+      <div className="p-3 space-y-2">
+        <div className="skeleton h-5 w-24 rounded" />
+        <div className="skeleton h-4 w-full rounded" />
+        <div className="skeleton h-3 w-32 rounded" />
+      </div>
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\components\ProtectedRoute.jsx =====  
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+
+export default function ProtectedRoute() {
+  const { isAuthenticated, loading } = useAuth()
+  const location = useLocation()
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  if (!isAuthenticated)
+    return <Navigate to="/login" state={{ from: location }} replace />
+
+  return <Outlet />
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\components\layout\Footer.jsx =====  
+import { Link } from 'react-router-dom'
+export default function Footer() {
+  return (
+    <footer className="bg-slate-900 text-slate-400 mt-auto">
+      <div className="max-w-7xl mx-auto px-4 py-10">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center">
+                <span className="text-white font-black text-sm">T</span>
+              </div>
+              <span className="font-black text-lg text-white">Trade<span className="text-orange-400">Nest</span></span>
+            </div>
+            <p className="text-sm">India's trusted marketplace to buy and sell anything.</p>
+          </div>
+          <div>
+            <h4 className="font-bold text-white text-sm mb-3">Quick Links</h4>
+            <ul className="space-y-2 text-sm">
+              {[['/', 'Home'], ['/sell', 'Post Ad'], ['/wishlist', 'Wishlist'], ['/dashboard', 'Dashboard']].map(([t, l]) => (
+                <li key={t}><Link to={t} className="hover:text-orange-400 transition-colors">{l}</Link></li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-bold text-white text-sm mb-3">Categories</h4>
+            <ul className="space-y-2 text-sm">
+              {[['cars','Cars'],['phones','Mobiles'],['electronics','Electronics'],['furniture','Furniture'],['fashion','Fashion']].map(([s,l]) => (
+                <li key={s}><Link to={`/category/${s}`} className="hover:text-orange-400 transition-colors">{l}</Link></li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-bold text-white text-sm mb-3">Support</h4>
+            <ul className="space-y-2 text-sm">
+              {['Help Center','Safety Tips','Privacy Policy','Terms of Service'].map(t => (
+                <li key={t} className="cursor-default hover:text-orange-400 transition-colors">{t}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm">
+          <p>© {new Date().getFullYear()} TradeNest. All rights reserved.</p>
+          <p>Made with ❤️ in India</p>
+        </div>
+      </div>
+    </footer>
+  )
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\components\layout\Navbar.jsx =====  
+import { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import {
+  Search, ChevronDown, Heart, MessageCircle, Plus,
+  LogOut, LayoutDashboard, Package, Tag, Menu, X,
+  Bookmark, Bell, User, CheckCheck,
+} from 'lucide-react'
+import { useAuth }          from '../../context/AuthContext'
+import { useWishlist }      from '../../context/WishlistContext'
+import { useNotifications } from '../../context/NotificationContext'
+import { categoriesAPI }    from '../../api'
+import { formatDistanceToNow } from 'date-fns'
+
+export default function Navbar() {
+  const { user, isAuthenticated, logout } = useAuth()
+  const { ids: wishIds }                  = useWishlist()
+  const { notifications, unreadCount, markAllRead, markOneRead } = useNotifications()
+  const navigate  = useNavigate()
+  const location  = useLocation()
+
+  const [query,       setQuery]       = useState('')
+  const [cats,        setCats]        = useState([])
+  const [showCat,     setShowCat]     = useState(false)
+  const [showUser,    setShowUser]    = useState(false)
+  const [showNotif,   setShowNotif]   = useState(false)
+  const [mobileOpen,  setMobileOpen]  = useState(false)
+
+  const catRef   = useRef(null)
+  const userRef  = useRef(null)
+  const notifRef = useRef(null)
+
+  useEffect(() => {
+    categoriesAPI.getAll()
+      .then(r => setCats(r.data.data || []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const h = e => {
+      if (catRef.current   && !catRef.current.contains(e.target))   setShowCat(false)
+      if (userRef.current  && !userRef.current.contains(e.target))  setShowUser(false)
+      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotif(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  useEffect(() => { setMobileOpen(false) }, [location.pathname])
+
+  // Sync search box with URL ?q= param
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get('q') || ''
+    setQuery(q)
+  }, [location.search])
+
+  const handleSearch = e => {
+    e.preventDefault()
+    if (query.trim()) navigate(`/search?q=${encodeURIComponent(query.trim())}`)
+    else navigate('/')
+  }
+
+  const doLogout = () => { logout(); setShowUser(false); navigate('/') }
+
+  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=f97316&color=fff&size=64&bold=true`
+
+  const handleNotifClick = async (n) => {
+    if (!n.read) await markOneRead(n.id)
+    setShowNotif(false)
+    // Navigate based on notification type
+    if (n.type === 'MESSAGE' && n.referenceId) navigate('/chat')
+    else if (n.type === 'OFFER' && n.referenceId) navigate('/offers')
+    else if (n.referenceId) navigate(`/product/${n.referenceId}`)
+  }
+
+  return (
+    <header className="bg-white border-b border-slate-100 sticky top-0 z-50 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="h-16 flex items-center gap-3">
+
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2 shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shadow-sm">
+              <span className="text-white font-black text-sm">T</span>
+            </div>
+            <span className="hidden sm:block font-black text-lg text-slate-900">
+              Trade<span className="text-orange-500">Nest</span>
+            </span>
+          </Link>
+
+          {/* Category dropdown */}
+          <div className="relative hidden md:block" ref={catRef}>
+            <button
+              onClick={() => setShowCat(v => !v)}
+              className="flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+            >
+              Categories
+              <ChevronDown size={13} className={`transition-transform ${showCat ? 'rotate-180' : ''}`} />
+            </button>
+            {showCat && (
+              <div className="absolute top-full left-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl w-[400px] p-3 grid grid-cols-3 gap-1 z-50">
+                {cats.map(c => (
+                  <Link
+                    key={c.id}
+                    to={`/category/${c.slug}`}
+                    onClick={() => setShowCat(false)}
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-orange-50 text-slate-700 hover:text-orange-700 transition-colors text-sm font-medium"
+                  >
+                    <span className="text-base">{c.icon}</span>
+                    <span className="truncate">{c.name}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Search bar */}
+          <form onSubmit={handleSearch} className="flex-1 max-w-xl">
+            <div className="relative">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search cars, phones, furniture..."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white transition-all"
+              />
+            </div>
+          </form>
+
+          {/* Right side */}
+          <div className="flex items-center gap-1 ml-auto shrink-0">
+            {isAuthenticated ? (
+              <>
+                <Link to="/chat" className="btn-ghost p-2.5 hidden sm:flex" title="Messages">
+                  <MessageCircle size={20} />
+                </Link>
+
+                <Link to="/wishlist" className="relative btn-ghost p-2.5 hidden sm:flex" title="Wishlist">
+                  <Heart size={20} />
+                  {wishIds.size > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none">
+                      {wishIds.size > 9 ? '9+' : wishIds.size}
+                    </span>
+                  )}
+                </Link>
+
+                {/* ✅ NEW: Notification bell */}
+                <div className="relative hidden sm:block" ref={notifRef}>
+                  <button
+                    onClick={() => { setShowNotif(v => !v); if (!showNotif && unreadCount > 0) {} }}
+                    className="btn-ghost p-2.5 relative"
+                    title="Notifications"
+                  >
+                    <Bell size={20} />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 w-4 h-4 bg-orange-500 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {showNotif && (
+                    <div className="absolute right-0 top-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl w-80 z-50 overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                        <p className="font-bold text-slate-900 text-sm">Notifications</p>
+                        {unreadCount > 0 && (
+                          <button onClick={markAllRead}
+                            className="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-700 font-semibold">
+                            <CheckCheck size={13} /> Mark all read
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+                        {notifications.length === 0 ? (
+                          <div className="p-6 text-center text-sm text-slate-400">
+                            <Bell size={28} className="mx-auto mb-2 text-slate-200" />
+                            No notifications yet
+                          </div>
+                        ) : (
+                          notifications.slice(0, 20).map(n => (
+                            <button
+                              key={n.id}
+                              onClick={() => handleNotifClick(n)}
+                              className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${!n.read ? 'bg-orange-50/60' : ''}`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.read ? 'bg-orange-500' : 'bg-transparent'}`} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-slate-800 truncate">{n.title}</p>
+                                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
+                                  {n.createdAt && (
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                      {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Link to="/sell" className="btn-primary text-sm ml-1 hidden sm:inline-flex">
+                  <Plus size={15} /> Sell
+                </Link>
+
+                {/* Avatar dropdown */}
+                <div className="relative ml-1" ref={userRef}>
+                  <button
+                    onClick={() => setShowUser(v => !v)}
+                    className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-slate-50 transition-colors"
+                  >
+                    <img src={avatar} alt={user?.name} className="w-8 h-8 rounded-xl object-cover border-2 border-orange-200" />
+                    <ChevronDown size={13} className={`hidden sm:block text-slate-400 transition-transform ${showUser ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showUser && (
+                    <div className="absolute right-0 top-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl w-52 py-2 z-50">
+                      <div className="px-4 py-2.5 border-b border-slate-100">
+                        <p className="font-bold text-slate-900 text-sm truncate">{user?.name}</p>
+                        <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                      </div>
+                      <div className="py-1">
+                        {[
+                          ['/profile',     <User size={14} />,          'My Profile'],
+                          ['/my-listings', <Package size={14} />,       'My Listings'],
+                          ['/offers',      <Tag size={14} />,           'Offers'],
+                          ['/wishlist',    <Bookmark size={14} />,      'Wishlist'],
+                          ['/dashboard',   <LayoutDashboard size={14} />, 'Dashboard'],
+                        ].map(([to, icon, label]) => (
+                          <Link key={to} to={to} onClick={() => setShowUser(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                            <span className="text-slate-400">{icon}</span>{label}
+                          </Link>
+                        ))}
+                      </div>
+                      <div className="border-t border-slate-100 pt-1">
+                        <button onClick={doLogout}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
+                          <LogOut size={14} /> Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <Link to="/login"    className="btn-ghost text-sm hidden sm:flex">Login</Link>
+                <Link to="/register" className="btn-secondary text-sm hidden sm:flex">Register</Link>
+                <Link to="/sell"     className="btn-primary text-sm hidden sm:inline-flex"><Plus size={15} /> Sell</Link>
+              </>
+            )}
+
+            {/* Mobile hamburger */}
+            <button onClick={() => setMobileOpen(v => !v)} className="btn-ghost p-2 sm:hidden">
+              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile menu */}
+        {mobileOpen && (
+          <div className="sm:hidden border-t border-slate-100 py-3 space-y-1">
+            {isAuthenticated ? (
+              <>
+                <MobLink to="/sell"        label="+ Sell" primary />
+                <MobLink to="/chat"        label="Messages" />
+                <MobLink to="/wishlist"    label="Wishlist" />
+                <MobLink to="/my-listings" label="My Listings" />
+                <MobLink to="/offers"      label="Offers" />
+                <MobLink to="/dashboard"   label="Dashboard" />
+                <MobLink to="/profile"     label="My Profile" />
+                <button onClick={doLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 rounded-xl">
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <MobLink to="/login"    label="Login" />
+                <MobLink to="/register" label="Register" />
+                <MobLink to="/sell"     label="+ Sell" primary />
+              </>
+            )}
+            <div className="pt-2 border-t border-slate-100">
+              <p className="px-4 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Categories</p>
+              <div className="grid grid-cols-4 gap-1 px-2">
+                {cats.slice(0, 8).map(c => (
+                  <Link key={c.id} to={`/category/${c.slug}`}
+                    className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-orange-50">
+                    <span className="text-xl">{c.icon}</span>
+                    <span className="text-[9px] font-bold text-slate-500 text-center leading-tight">{c.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </header>
+  )
+}
+
+function MobLink({ to, label, primary }) {
+  return (
+    <Link to={to} className={`block px-4 py-2.5 text-sm font-bold rounded-xl transition-colors ${
+      primary ? 'bg-orange-500 text-white' : 'text-slate-700 hover:bg-slate-50'
+    }`}>{label}</Link>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\context\AuthContext.jsx =====  
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { authAPI } from '../api'
+
+const AuthContext = createContext(null)
+
+function safeUser() {
+  try { return JSON.parse(localStorage.getItem('tn_user') || 'null') }
+  catch { return null }
+}
+
+export function AuthProvider({ children }) {
+  const [user,    setUser]    = useState(safeUser)
+  const [token,   setToken]   = useState(() => localStorage.getItem('tn_token') || null)
+  const [loading, setLoading] = useState(true)
+
+  // Forced logout from 401 interceptor
+  useEffect(() => {
+    const h = () => { setToken(null); setUser(null) }
+    window.addEventListener('tn:logout', h)
+    return () => window.removeEventListener('tn:logout', h)
+  }, [])
+
+  // Verify token on app start
+  useEffect(() => {
+    if (!token) { setLoading(false); return }
+    authAPI.profile()
+      .then(r => {
+        const u = r.data.data
+        setUser(u)
+        localStorage.setItem('tn_user', JSON.stringify(u))
+      })
+      .catch(() => {
+        localStorage.removeItem('tn_token')
+        localStorage.removeItem('tn_user')
+        setToken(null); setUser(null)
+      })
+      .finally(() => setLoading(false))
+  }, []) // eslint-disable-line
+
+  const login = useCallback(async (email, password) => {
+    const r = await authAPI.login({ email: email.toLowerCase().trim(), password })
+    const { token: t, user: u } = r.data.data
+    localStorage.setItem('tn_token', t)
+    localStorage.setItem('tn_user', JSON.stringify(u))
+    setToken(t); setUser(u)
+    return u
+  }, [])
+
+  const register = useCallback(async (data) => {
+    const r = await authAPI.register({ ...data, email: data.email.toLowerCase().trim() })
+    const { token: t, user: u } = r.data.data
+    localStorage.setItem('tn_token', t)
+    localStorage.setItem('tn_user', JSON.stringify(u))
+    setToken(t); setUser(u)
+    return u
+  }, [])
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('tn_token')
+    localStorage.removeItem('tn_user')
+    setToken(null); setUser(null)
+  }, [])
+
+  return (
+    <AuthContext.Provider value={{
+      user, token, loading,
+      isAuthenticated: !!token && !!user,
+      login, register, logout,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be inside AuthProvider')
+  return ctx
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\context\NotificationContext.jsx =====  
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { notificationsAPI } from '../api'
+import { useAuth } from './AuthContext'
+
+const NotificationContext = createContext(null)
+
+export function NotificationProvider({ children }) {
+  const { isAuthenticated } = useAuth()
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount,   setUnreadCount]   = useState(0)
+
+  const fetchAll = useCallback(async () => {
+    if (!isAuthenticated) { setNotifications([]); setUnreadCount(0); return }
+    try {
+      const r = await notificationsAPI.getAll()
+      const list = r.data.data || []
+      setNotifications(list)
+      setUnreadCount(list.filter(n => !n.read).length)
+    } catch {}
+  }, [isAuthenticated])
+
+  useEffect(() => { fetchAll() }, [fetchAll])
+
+  // Poll every 30 seconds for new notifications
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const id = setInterval(fetchAll, 30000)
+    return () => clearInterval(id)
+  }, [isAuthenticated, fetchAll])
+
+  useEffect(() => {
+    if (!isAuthenticated) { setNotifications([]); setUnreadCount(0) }
+  }, [isAuthenticated])
+
+  const markAllRead = useCallback(async () => {
+    try {
+      await notificationsAPI.markAllRead()
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+      setUnreadCount(0)
+    } catch {}
+  }, [])
+
+  const markOneRead = useCallback(async (id) => {
+    try {
+      await notificationsAPI.markOneRead(id)
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, read: true } : n)
+      )
+      setUnreadCount(prev => Math.max(0, prev - 1))
+    } catch {}
+  }, [])
+
+  return (
+    <NotificationContext.Provider value={{
+      notifications, unreadCount, fetchAll, markAllRead, markOneRead,
+    }}>
+      {children}
+    </NotificationContext.Provider>
+  )
+}
+
+export const useNotifications = () => {
+  const ctx = useContext(NotificationContext)
+  if (!ctx) throw new Error('useNotifications must be inside NotificationProvider')
+  return ctx
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\context\WishlistContext.jsx =====  
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { wishlistAPI } from '../api'
+import { useAuth } from './AuthContext'
+import toast from 'react-hot-toast'
+
+const WishlistContext = createContext(null)
+
+export function WishlistProvider({ children }) {
+  const { isAuthenticated } = useAuth()
+  const [ids,      setIds]      = useState(new Set())   // Set<number>
+  const [busyIds,  setBusyIds]  = useState(new Set())   // ids in-flight
+
+  const fetch = useCallback(async () => {
+    if (!isAuthenticated) { setIds(new Set()); return }
+    try {
+      const r = await wishlistAPI.getAll()
+      setIds(new Set((r.data.data || []).map(w => Number(w.productId))))
+    } catch {}
+  }, [isAuthenticated])
+
+  useEffect(() => { fetch() }, [fetch])
+
+  useEffect(() => {
+    if (!isAuthenticated) setIds(new Set())
+  }, [isAuthenticated])
+
+  const isWishlisted = useCallback((pid) => ids.has(Number(pid)), [ids])
+  const isToggling   = useCallback((pid) => busyIds.has(Number(pid)), [busyIds])
+
+  const toggle = useCallback(async (pid) => {
+    pid = Number(pid)
+    if (!isAuthenticated) { toast.error('Login to save to wishlist'); return false }
+    if (busyIds.has(pid)) return false
+    setBusyIds(p => new Set([...p, pid]))
+    const wasIn = ids.has(pid)
+    try {
+      if (wasIn) {
+        await wishlistAPI.remove(pid)
+        setIds(p => { const n = new Set(p); n.delete(pid); return n })
+        toast.success('Removed from wishlist')
+      } else {
+        await wishlistAPI.add(pid)
+        setIds(p => new Set([...p, pid]))
+        toast.success('Saved to wishlist')
+      }
+      return true
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Wishlist failed')
+      return false
+    } finally {
+      setBusyIds(p => { const n = new Set(p); n.delete(pid); return n })
+    }
+  }, [isAuthenticated, ids, busyIds])
+
+  return (
+    <WishlistContext.Provider value={{ ids, isWishlisted, isToggling, toggle, fetchWishlist: fetch }}>
+      {children}
+    </WishlistContext.Provider>
+  )
+}
+
+export const useWishlist = () => {
+  const ctx = useContext(WishlistContext)
+  if (!ctx) throw new Error('useWishlist must be inside WishlistProvider')
+  return ctx
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\features\offers\MakeOfferModal.jsx =====  
+import { useState } from 'react'
+import { X, Tag, CheckCircle } from 'lucide-react'
+import { offersAPI, fmtPrice } from '../../api'
+import toast from 'react-hot-toast'
+
+export default function MakeOfferModal({ product, onClose }) {
+  const [amount,  setAmount]  = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [done,    setDone]    = useState(false)
+
+  const listing = Number(product.price)
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+    const amt = parseFloat(amount)
+    if (!amt || amt <= 0)    { toast.error('Enter a valid amount'); return }
+    if (amt > listing * 1.1) { toast.error('Offer too high'); return }
+    setLoading(true)
+    try {
+      await offersAPI.make({ productId: product.id, amount: amt, message: message.trim() || null })
+      setDone(true)
+      setTimeout(() => { onClose(); toast.success('Offer sent!') }, 1600)
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to send offer')
+    } finally { setLoading(false) }
+  }
+
+  const pct = amount && listing ? Math.round(((listing - parseFloat(amount)) / listing) * 100) : 0
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-orange-50 rounded-xl flex items-center justify-center">
+              <Tag size={17} className="text-orange-600" />
+            </div>
+            <div>
+              <h2 className="font-bold text-slate-900 text-sm">Make an Offer</h2>
+              <p className="text-xs text-slate-400">Listed at {fmtPrice(listing)}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-slate-100 flex items-center justify-center transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {done ? (
+          <div className="p-10 text-center">
+            <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
+            <h3 className="font-black text-xl text-slate-900 mb-1">Offer Sent!</h3>
+            <p className="text-slate-500 text-sm">The seller will respond soon.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-5 space-y-4">
+            <div>
+              <label className="label">Your offer (₹)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                <input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)}
+                  placeholder="Enter amount" className="input pl-8 text-lg font-bold" autoFocus />
+              </div>
+              <div className="flex gap-2 mt-2">
+                {[90, 80, 70].map(p => {
+                  const v = Math.round(listing * p / 100)
+                  return (
+                    <button type="button" key={p} onClick={() => setAmount(String(v))}
+                      className="flex-1 py-1.5 text-xs font-bold bg-slate-100 hover:bg-orange-100 hover:text-orange-700 text-slate-600 rounded-lg transition-colors">
+                      {p}% · {fmtPrice(v)}
+                    </button>
+                  )
+                })}
+              </div>
+              {amount && pct > 0 && <p className="text-xs text-orange-600 font-bold mt-1">{pct}% off listing price</p>}
+            </div>
+            <div>
+              <label className="label">Message <span className="normal-case font-normal text-slate-300">(optional)</span></label>
+              <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3} maxLength={200}
+                placeholder="Why are you making this offer?" className="input resize-none" />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+              <button type="submit" disabled={loading || !amount || parseFloat(amount) <= 0}
+                className="btn-primary flex-1 disabled:opacity-50">
+                {loading
+                  ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : 'Send Offer'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\layouts\MainLayout.jsx =====  
+import { Outlet, useLocation } from 'react-router-dom'
+import Navbar from '../components/layout/Navbar'
+import Footer from '../components/layout/Footer'
+
+export default function MainLayout() {
+  const { pathname } = useLocation()
+  const noFooter = pathname.startsWith('/chat') || pathname.startsWith('/sell')
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <main className="flex-1 page-fade"><Outlet /></main>
+      {!noFooter && <Footer />}
+    </div>
+  )
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\CategoryPage.jsx =====  
+import { useState, useEffect, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { productsAPI, categoriesAPI } from '../api'
+import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
+
+const PAGE_SIZE = 20
+
+export default function CategoryPage() {
+  const { slug }   = useParams()
+  const navigate   = useNavigate()
+
+  const [products,  setProducts]  = useState([])
+  const [category,  setCategory]  = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const [sort,      setSort]      = useState('latest')
+  const [page,      setPage]      = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+
+  // Reset page when slug or sort changes
+  useEffect(() => { setPage(0) }, [slug, sort])
+
+  const load = useCallback(() => {
+    setLoading(true)
+    Promise.all([
+      // ✅ FIX: use backend category endpoint — no more client-side filtering
+      productsAPI.getByCategory(slug, page, PAGE_SIZE),
+      categoriesAPI.getBySlug(slug).catch(() => null),
+    ]).then(([pR, cR]) => {
+      if (cR) setCategory(cR.data.data)
+      const paged = pR.data.data
+      setProducts(paged.content || [])
+      setTotalPages(paged.totalPages || 1)
+      setTotalItems(paged.totalElements || 0)
+    }).catch(() => {})
+      .finally(() => setLoading(false))
+  }, [slug, page])
+
+  useEffect(() => { load() }, [load])
+
+  // Client-side sort on the current page
+  const sorted = [...products].sort((a, b) => {
+    if (sort === 'price_asc')  return Number(a.price) - Number(b.price)
+    if (sort === 'price_desc') return Number(b.price) - Number(a.price)
+    return new Date(b.postedDate) - new Date(a.postedDate)
+  })
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="flex flex-wrap items-center gap-4 mb-6">
+        <button onClick={() => navigate(-1)} className="btn-ghost p-2">
+          <ArrowLeft size={20} />
+        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-4xl">{category?.icon}</span>
+          <div>
+            <h1 className="font-black text-2xl text-slate-900">
+              {category?.name || slug}
+            </h1>
+            <p className="text-sm text-slate-400">{totalItems} listings</p>
+          </div>
+        </div>
+        <div className="ml-auto">
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            className="input w-auto py-2 text-sm">
+            <option value="latest">Latest first</option>
+            <option value="price_asc">Price: Low → High</option>
+            <option value="price_desc">Price: High → Low</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+        </div>
+      ) : sorted.length === 0 ? (
+        <div className="text-center py-20">
+          <div className="text-6xl mb-4">{category?.icon || '📦'}</div>
+          <h3 className="font-bold text-xl text-slate-600 mb-2">No listings yet</h3>
+          <p className="text-slate-400 text-sm mb-5">Be the first to post in this category!</p>
+          <button onClick={() => navigate('/sell')} className="btn-primary">Post an Ad</button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {sorted.map(p => <ProductCard key={p.id} product={p} />)}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-8">
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="btn-ghost p-2 disabled:opacity-40">
+            <ChevronLeft size={18} />
+          </button>
+
+          {Array.from({ length: totalPages }, (_, i) => i)
+            .filter(i => i === 0 || i === totalPages - 1 ||
+                         Math.abs(i - page) <= 1)
+            .reduce((acc, i, idx, arr) => {
+              if (idx > 0 && i - arr[idx - 1] > 1) acc.push('…')
+              acc.push(i)
+              return acc
+            }, [])
+            .map((item, idx) =>
+              item === '…' ? (
+                <span key={`gap-${idx}`} className="px-2 text-slate-400">…</span>
+              ) : (
+                <button key={item} onClick={() => setPage(item)}
+                  className={`w-9 h-9 rounded-xl text-sm font-bold transition-colors ${
+                    item === page
+                      ? 'bg-orange-500 text-white'
+                      : 'hover:bg-slate-100 text-slate-600'
+                  }`}>
+                  {item + 1}
+                </button>
+              )
+            )}
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="btn-ghost p-2 disabled:opacity-40">
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\ChatPage.jsx =====  
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Link } from 'react-router-dom'
+import { MessageCircle, Send, ArrowLeft, Package, RefreshCw } from 'lucide-react'
+import { messagesAPI } from '../api'
+import { useAuth } from '../context/AuthContext'
+import { formatDistanceToNow } from 'date-fns'
+import toast from 'react-hot-toast'
+
+const POLL_MS = 5000
+
+export default function ChatPage() {
+  const { user } = useAuth()
+  const [convs,    setConvs]    = useState([])
+  const [selected, setSelected] = useState(null)
+  const [msgs,     setMsgs]     = useState([])
+  const [input,    setInput]    = useState('')
+  const [loadC,    setLoadC]    = useState(true)
+  const [loadM,    setLoadM]    = useState(false)
+  const [sending,  setSending]  = useState(false)
+  const bottomRef = useRef(null)
+  const pollRef   = useRef(null)
+  const inputRef  = useRef(null)
+
+  const loadConvs = useCallback(() => {
+    messagesAPI.getConversations()
+      .then(r => setConvs(r.data.data || []))
+      .catch(() => {})
+      .finally(() => setLoadC(false))
+  }, [])
+
+  useEffect(() => { loadConvs() }, [loadConvs])
+
+  const loadMsgs = useCallback((id, silent = false) => {
+    if (!id) return
+    if (!silent) setLoadM(true)
+    messagesAPI.getMessages(id)
+      .then(r => {
+        setMsgs(r.data.data || [])
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
+      })
+      .catch(() => {})
+      .finally(() => { if (!silent) setLoadM(false) })
+  }, [])
+
+  useEffect(() => {
+    clearInterval(pollRef.current)
+    if (!selected) return
+    loadMsgs(selected.id)
+    pollRef.current = setInterval(() => loadMsgs(selected.id, true), POLL_MS)
+    return () => clearInterval(pollRef.current)
+  }, [selected, loadMsgs])
+
+  const selectConv = conv => {
+    setSelected(conv)
+    setMsgs([])
+    messagesAPI.markRead(conv.id).catch(() => {})
+  }
+
+  const handleSend = async e => {
+    e.preventDefault()
+    const content = input.trim()
+    if (!content || !selected || sending) return
+    setInput('')
+    setSending(true)
+    try {
+      const res = await messagesAPI.sendMessage(selected.id, { content })
+      setMsgs(prev => [...prev, res.data.data])
+      setConvs(prev => prev.map(c =>
+        c.id === selected.id ? { ...c, lastMessage: content } : c
+      ))
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    } catch {
+      toast.error('Message failed')
+      setInput(content)
+    } finally { setSending(false); inputRef.current?.focus() }
+  }
+
+  // ✅ FIX: use real names from ConversationDto instead of generic "Seller"/"Buyer"
+  const getOtherName = (conv) => {
+    if (!conv || !user) return 'User'
+    return conv.buyerId === user.id ? conv.sellerName : conv.buyerName
+  }
+
+  const av = name =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=f97316&color=fff&size=40&bold=true`
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+          <MessageCircle size={20} className="text-blue-600" />
+        </div>
+        <h1 className="font-black text-2xl text-slate-900">Messages</h1>
+        <button onClick={loadConvs} className="ml-auto btn-ghost p-2" title="Refresh">
+          <RefreshCw size={16} />
+        </button>
+      </div>
+
+      <div className="card overflow-hidden" style={{ height: 'calc(100vh - 200px)', minHeight: 520 }}>
+        <div className="flex h-full">
+
+          {/* Conversation list */}
+          <div className={`w-full md:w-72 border-r border-slate-100 flex flex-col shrink-0 ${selected ? 'hidden md:flex' : 'flex'}`}>
+            <div className="px-4 py-3 border-b border-slate-100">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Conversations</p>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {loadC ? (
+                <div className="p-4 space-y-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="skeleton w-10 h-10 rounded-full shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="skeleton h-3 w-24 rounded" />
+                        <div className="skeleton h-3 w-full rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : convs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+                  <MessageCircle size={36} className="text-slate-200 mb-3" />
+                  <p className="text-sm font-bold text-slate-500">No conversations</p>
+                  <p className="text-xs text-slate-400 mt-1">Start a chat from any product page</p>
+                </div>
+              ) : (
+                convs.map(conv => {
+                  const otherName = getOtherName(conv)
+                  return (
+                    <button key={conv.id} onClick={() => selectConv(conv)}
+                      className={`w-full flex items-start gap-3 p-4 text-left hover:bg-slate-50 transition-colors border-b border-slate-50 ${
+                        selected?.id === conv.id ? 'bg-orange-50 border-l-2 border-l-orange-500' : ''
+                      }`}>
+                      <img src={av(otherName)} alt="" className="w-10 h-10 rounded-full shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        {/* ✅ FIX: real name shown here */}
+                        <p className="text-sm font-bold text-slate-800">{otherName}</p>
+                        <p className="text-[10px] text-slate-400 flex items-center gap-1 mb-0.5">
+                          <Package size={9} />
+                          {/* ✅ FIX: show product title instead of just ID */}
+                          {conv.productTitle || `Listing #${conv.productId}`}
+                        </p>
+                        {conv.lastMessage && (
+                          <p className="text-xs text-slate-500 truncate">{conv.lastMessage}</p>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Message pane */}
+          <div className={`flex-1 flex flex-col min-w-0 ${!selected ? 'hidden md:flex' : 'flex'}`}>
+            {!selected ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
+                  <MessageCircle size={28} className="text-slate-400" />
+                </div>
+                <p className="font-bold text-slate-600">Select a conversation</p>
+                <p className="text-sm text-slate-400 mt-1">Choose from the left panel</p>
+              </div>
+            ) : (
+              <>
+                {/* Header */}
+                <div className="p-4 border-b border-slate-100 flex items-center gap-3 bg-white">
+                  <button onClick={() => setSelected(null)} className="md:hidden btn-ghost p-1.5">
+                    <ArrowLeft size={18} />
+                  </button>
+                  <img src={av(getOtherName(selected))} alt="" className="w-9 h-9 rounded-full" />
+                  <div>
+                    {/* ✅ FIX: real name in header */}
+                    <p className="font-bold text-slate-800 text-sm">{getOtherName(selected)}</p>
+                    <Link to={`/product/${selected.productId}`}
+                      className="text-xs text-orange-500 hover:underline flex items-center gap-1">
+                      <Package size={10} />
+                      {/* ✅ FIX: product title in header link */}
+                      {selected.productTitle || `Listing #${selected.productId}`}
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                  {loadM ? (
+                    <div className="flex justify-center py-8">
+                      <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : msgs.length === 0 ? (
+                    <div className="text-center py-10 text-sm text-slate-400">
+                      No messages yet — say hi! 👋
+                    </div>
+                  ) : (
+                    msgs.map(msg => {
+                      const isMe = msg.senderId === user?.id
+                      return (
+                        <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                            isMe
+                              ? 'bg-orange-500 text-white rounded-br-md'
+                              : 'bg-white text-slate-800 rounded-bl-md border border-slate-100'
+                          }`}>
+                            <p>{msg.content}</p>
+                            {msg.sentAt && (
+                              <p className={`text-[10px] mt-1 ${isMe ? 'text-orange-200' : 'text-slate-400'}`}>
+                                {formatDistanceToNow(new Date(msg.sentAt), { addSuffix: true })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                  <div ref={bottomRef} />
+                </div>
+
+                {/* Input */}
+                <form onSubmit={handleSend} className="p-3 border-t border-slate-100 flex gap-2 bg-white">
+                  <input
+                    ref={inputRef}
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 input py-2.5"
+                    disabled={sending}
+                    autoFocus
+                  />
+                  <button type="submit" disabled={!input.trim() || sending}
+                    className="btn-primary px-4 py-2.5 disabled:opacity-50">
+                    {sending
+                      ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : <Send size={15} />}
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\DashboardPage.jsx =====  
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { LayoutDashboard, Package, Tag, Heart, Star, Plus, ArrowRight } from 'lucide-react'
+import { dashboardAPI } from '../api'
+import { useAuth } from '../context/AuthContext'
+import toast from 'react-hot-toast'
+
+export default function DashboardPage() {
+  const { user }    = useAuth()
+  const [stats,     setStats]   = useState(null)
+  const [loading,   setLoading] = useState(true)
+
+  useEffect(() => {
+    dashboardAPI.get()
+      .then(r => setStats(r.data.data))
+      .catch(() => toast.error('Failed to load dashboard'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=f97316&color=fff&size=128&bold=true`
+
+  const statCards = stats ? [
+    { label: 'Total Listings',  value: stats.totalProducts,      icon: <Package size={20} />, color: 'bg-blue-50 text-blue-600',   link: '/my-listings' },
+    { label: 'Offers Received', value: stats.totalOffersReceived,icon: <Tag size={20} />,     color: 'bg-purple-50 text-purple-600', link: '/offers' },
+    { label: 'Wishlist Saves',  value: stats.totalWishlistCount, icon: <Heart size={20} />,   color: 'bg-red-50 text-red-500',       link: '/wishlist' },
+    { label: 'Reviews',         value: stats.totalReviews,       icon: <Star size={20} />,    color: 'bg-amber-50 text-amber-500',   link: '#' },
+  ] : []
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-10">
+      <div className="flex items-center gap-3 mb-7">
+        <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
+          <LayoutDashboard size={20} className="text-orange-600" />
+        </div>
+        <div>
+          <h1 className="font-black text-2xl text-slate-900">Dashboard</h1>
+          <p className="text-slate-400 text-sm">Your seller overview</p>
+        </div>
+      </div>
+
+      {/* Profile banner */}
+      <div className="rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 mb-6 overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="relative flex items-center gap-5">
+          <img src={avatar} alt={user?.name} className="w-16 h-16 rounded-2xl border-2 border-white/20 object-cover" />
+          <div className="flex-1 min-w-0">
+            <h2 className="font-black text-xl">{user?.name}</h2>
+            <p className="text-slate-400 text-sm">{user?.email}</p>
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <span className="text-xs text-slate-400">{user?.city}, {user?.state}</span>
+              {user?.verified && <span className="badge bg-green-500/20 text-green-400">✓ Verified</span>}
+            </div>
+          </div>
+          {stats && stats.totalReviews > 0 && (
+            <div className="text-right hidden sm:block">
+              <div className="flex justify-end">
+                {[1,2,3,4,5].map(s => (
+                  <Star key={s} size={15} className={s <= Math.round(stats.averageRating) ? 'text-amber-400 fill-amber-400' : 'text-slate-600'} />
+                ))}
+              </div>
+              <p className="text-slate-400 text-xs mt-1">{stats.averageRating} avg · {stats.totalReviews} reviews</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Stat cards */}
+      {loading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="card p-5 space-y-3">
+              <div className="skeleton w-11 h-11 rounded-xl" />
+              <div className="skeleton h-7 w-16 rounded" />
+              <div className="skeleton h-3 w-24 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {statCards.map(card => (
+            <Link key={card.label} to={card.link}
+              className="card p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${card.color}`}>
+                {card.icon}
+              </div>
+              <p className="font-black text-3xl text-slate-900">{card.value}</p>
+              <p className="text-sm text-slate-400 mt-1">{card.label}</p>
+              <div className="flex items-center gap-1 text-xs text-orange-500 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                View <ArrowRight size={10} />
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Quick actions */}
+      <div className="card p-6">
+        <h3 className="font-bold text-slate-900 mb-4 text-sm flex items-center gap-2">
+          <span className="text-orange-500">↗</span> Quick Actions
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { to: '/sell',        label: 'Post New Ad',   sub: 'List an item',     icon: <Plus size={18} />,       primary: true },
+            { to: '/my-listings', label: 'My Listings',   sub: 'Manage your ads',  icon: <Package size={18} /> },
+            { to: '/offers',      label: 'Manage Offers', sub: 'Accept or reject', icon: <Tag size={18} /> },
+          ].map(a => (
+            <Link key={a.to} to={a.to}
+              className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer ${
+                a.primary
+                  ? 'bg-orange-50 border-orange-200 hover:border-orange-400'
+                  : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50'
+              }`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                a.primary ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {a.icon}
+              </div>
+              <div>
+                <p className="font-bold text-slate-800 text-sm">{a.label}</p>
+                <p className="text-xs text-slate-400">{a.sub}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\EditProductPage.jsx =====  
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Save } from 'lucide-react'
+import { productsAPI, categoriesAPI, citiesAPI } from '../api'
+import toast from 'react-hot-toast'
+
+export default function EditProductPage() {
+  const { id }   = useParams()
+  const navigate = useNavigate()
+  const [fetching, setFetching] = useState(true)
+  const [saving,   setSaving]   = useState(false)
+  const [cats,     setCats]     = useState([])
+  const [cities,   setCities]   = useState([])
+  const [form,     setForm]     = useState({
+    title: '', description: '', price: '',
+    city: '', state: '', categoryId: '', featured: false,
+  })
+
+  useEffect(() => {
+    Promise.all([
+      productsAPI.getById(id),
+      categoriesAPI.getAll(),
+      citiesAPI.getAll(),
+    ]).then(([pR, cR, ciR]) => {
+      const p = pR.data.data
+      setForm({
+        title:       p.title       || '',
+        description: p.description || '',
+        price:       p.price       || '',
+        city:        p.city        || '',
+        state:       p.state       || '',
+        // ✅ Use flat DTO field: p.categoryId instead of p.category?.id
+        categoryId:  p.categoryId  || '',
+        featured:    p.featured    || false,
+      })
+      setCats(cR.data.data    || [])
+      setCities(ciR.data.data || [])
+    })
+    .catch(() => toast.error('Failed to load product'))
+    .finally(() => setFetching(false))
+  }, [id])
+
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const handleCity = e => {
+    const name  = e.target.value
+    const found = cities.find(c => c.city === name)
+    setForm(f => ({ ...f, city: name, state: found?.state || '' }))
+  }
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+    if (!form.title.trim() || !form.price || parseFloat(form.price) <= 0) {
+      toast.error('Fill in title and a valid price')
+      return
+    }
+    setSaving(true)
+    try {
+      await productsAPI.update(id, {
+        title:       form.title.trim(),
+        description: form.description.trim(),
+        price:       parseFloat(form.price),
+        city:        form.city,
+        state:       form.state,
+        featured:    form.featured,
+        category:    { id: parseInt(form.categoryId) },
+      })
+      toast.success('Listing updated!')
+      navigate(`/product/${id}`)
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Update failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (fetching) return (
+    <div className="max-w-2xl mx-auto px-4 py-10 space-y-4">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="skeleton h-12 rounded-xl" />
+      ))}
+    </div>
+  )
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-10">
+      <div className="flex items-center gap-3 mb-8">
+        <button onClick={() => navigate(-1)} className="btn-ghost p-2">
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <h1 className="font-black text-2xl text-slate-900">Edit Listing</h1>
+          <p className="text-slate-400 text-sm">Update your ad details</p>
+        </div>
+      </div>
+
+      <div className="card p-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Category */}
+          <div>
+            <label className="label">Category</label>
+            <select value={form.categoryId} onChange={set('categoryId')} className="input">
+              <option value="">Select category</option>
+              {cats.map(c => (
+                <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Title */}
+          <div>
+            <label className="label">Title</label>
+            <input
+              value={form.title}
+              onChange={set('title')}
+              placeholder="e.g. Honda City 2019"
+              className="input"
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="label">Description</label>
+            <textarea
+              value={form.description}
+              onChange={set('description')}
+              placeholder="Describe your item..."
+              rows={4}
+              className="input resize-none"
+            />
+          </div>
+
+          {/* Price */}
+          <div>
+            <label className="label">Price (₹)</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">
+                ₹
+              </span>
+              <input
+                type="number"
+                min="1"
+                value={form.price}
+                onChange={set('price')}
+                placeholder="0"
+                className="input pl-8 text-lg font-bold"
+                required
+              />
+            </div>
+          </div>
+
+          {/* City */}
+          <div>
+            <label className="label">City</label>
+            <select value={form.city} onChange={handleCity} className="input">
+              <option value="">Select city</option>
+              {cities.map(c => (
+                <option key={c.id} value={c.city}>{c.city}, {c.state}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Featured */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.featured}
+              onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))}
+              className="w-4 h-4 rounded accent-orange-500"
+            />
+            <span className="text-sm font-medium text-slate-700">
+              Mark as Featured listing
+            </span>
+          </label>
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => navigate(-1)} className="btn-secondary flex-1">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="btn-primary flex-1 disabled:opacity-60">
+              {saving
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <><Save size={15} /> Save Changes</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\HomePage.jsx =====  
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Search, ArrowRight, Zap, Tag, RefreshCw, AlertTriangle, ChevronDown } from 'lucide-react'
+import { categoriesAPI, productsAPI } from '../api'
+import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
+
+const PAGE_SIZE = 20
+
+function ErrorBanner({ error, onRetry }) {
+  return (
+    <div className="mb-8 bg-red-50 border border-red-200 rounded-2xl p-5 flex items-start gap-3">
+      <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
+      <div className="flex-1">
+        <p className="font-bold text-red-800">Backend not reachable</p>
+        <p className="text-sm text-red-700 mt-1">
+          Make sure Spring Boot is running: <code className="bg-red-100 px-1 rounded">mvn spring-boot:run</code> on port 9000
+        </p>
+        {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+      </div>
+      <button onClick={onRetry} className="flex items-center gap-1.5 text-sm font-bold text-red-700 hover:text-red-900 shrink-0">
+        <RefreshCw size={14} /> Retry
+      </button>
+    </div>
+  )
+}
+
+export default function HomePage() {
+  const navigate = useNavigate()
+  const [query,    setQuery]    = useState('')
+  const [cats,     setCats]     = useState([])
+  const [featured, setFeatured] = useState([])
+  const [all,      setAll]      = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error,    setError]    = useState('')
+  const [page,     setPage]     = useState(0)
+  const [hasMore,  setHasMore]  = useState(true)
+
+  const load = () => {
+    setLoading(true)
+    setError('')
+    setPage(0)
+    Promise.all([
+      categoriesAPI.getAll(),
+      productsAPI.getFeatured(),
+      productsAPI.getAllPaged(0, PAGE_SIZE),
+    ])
+      .then(([cR, fR, aR]) => {
+        setCats(cR.data.data     || [])
+        setFeatured(fR.data.data || [])
+        const paged = aR.data.data
+        setAll(paged.content || [])
+        setHasMore(!paged.last)
+        setPage(1)
+      })
+      .catch(err => {
+        const status = err?.response?.status
+        setError(status
+          ? `${status} — ${err?.response?.data?.message || err.message}`
+          : 'Cannot reach backend. Is Spring Boot running on port 9000?'
+        )
+      })
+      .finally(() => setLoading(false))
+  }
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const r    = await productsAPI.getAllPaged(page, PAGE_SIZE)
+      const data = r.data.data
+      setAll(prev => [...prev, ...(data.content || [])])
+      setHasMore(!data.last)
+      setPage(p => p + 1)
+    } catch {} finally { setLoadingMore(false) }
+  }
+
+  useEffect(() => { load() }, [])
+
+  const handleSearch = e => {
+    e.preventDefault()
+    if (query.trim()) navigate(`/search?q=${encodeURIComponent(query.trim())}`)
+  }
+
+  return (
+    <div>
+      {/* Hero */}
+      <section className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-orange-950 text-white overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/3 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-orange-300/10 rounded-full blur-3xl" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 py-16 sm:py-24 text-center">
+          <span className="inline-flex items-center gap-2 bg-orange-500/20 border border-orange-500/30 text-orange-300 text-xs font-bold px-4 py-1.5 rounded-full mb-6">
+            <Zap size={13} /> India's fastest growing marketplace
+          </span>
+          <h1 className="font-black text-4xl sm:text-5xl lg:text-6xl leading-tight mb-5">
+            Buy &amp; Sell Anything<br />
+            <span className="text-orange-400">Near You</span>
+          </h1>
+          <p className="text-slate-400 text-lg mb-10 max-w-xl mx-auto">
+            From cars to electronics — find the best deals in your city, instantly.
+          </p>
+          {/* ✅ FIX: search now goes to /search?q= (backend-powered) */}
+          <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
+            <div className="flex bg-white rounded-2xl shadow-2xl overflow-hidden p-1.5 gap-2">
+              <div className="flex-1 flex items-center gap-2 pl-4">
+                <Search size={17} className="text-slate-400 shrink-0" />
+                <input
+                  value={query} onChange={e => setQuery(e.target.value)}
+                  placeholder="What are you looking for?"
+                  className="flex-1 text-slate-800 text-sm placeholder-slate-400 focus:outline-none py-2 bg-transparent"
+                />
+              </div>
+              <button type="submit" className="btn-primary rounded-xl px-6 shrink-0">Search</button>
+            </div>
+          </form>
+          <div className="flex items-center justify-center gap-8 mt-10 text-slate-500 text-sm">
+            {[['10L+', 'Listings'], ['500+', 'Cities'], ['50L+', 'Users']].map(([n, l]) => (
+              <div key={l} className="text-center">
+                <p className="text-2xl font-black text-white">{n}</p>
+                <p>{l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="max-w-7xl mx-auto px-4 py-10">
+
+        {error && <ErrorBanner error={error} onRetry={load} />}
+
+        {/* Categories */}
+        <section className="mb-12">
+          <h2 className="font-black text-2xl text-slate-900 mb-5">Browse Categories</h2>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+            {loading
+              ? Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="card p-4 flex flex-col items-center gap-2">
+                    <div className="skeleton w-10 h-10 rounded-xl" />
+                    <div className="skeleton h-3 w-14 rounded" />
+                  </div>
+                ))
+              : cats.map(cat => (
+                  <Link key={cat.id} to={`/category/${cat.slug}`}
+                    className="card p-4 flex flex-col items-center gap-2 hover:border-orange-300 hover:shadow-md hover:-translate-y-1 transition-all duration-200 cursor-pointer group">
+                    <span className="text-3xl group-hover:scale-110 transition-transform">{cat.icon}</span>
+                    <span className="text-[11px] font-bold text-slate-500 text-center leading-tight">{cat.name}</span>
+                  </Link>
+                ))
+            }
+          </div>
+        </section>
+
+        {/* Featured */}
+        {(loading || featured.length > 0) && (
+          <section className="mb-12">
+            <h2 className="font-black text-2xl text-slate-900 mb-5">⭐ Featured Listings</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {loading
+                ? Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)
+                : featured.slice(0, 8).map(p => <ProductCard key={p.id} product={p} />)
+              }
+            </div>
+          </section>
+        )}
+
+        {/* Latest listings */}
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-black text-2xl text-slate-900">Latest Listings</h2>
+            <Link to="/search" className="text-sm text-orange-500 hover:underline font-semibold">
+              View all →
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+            </div>
+          ) : all.length === 0 && !error ? (
+            <div className="text-center py-20">
+              <div className="text-5xl mb-4">📦</div>
+              <h3 className="font-bold text-xl text-slate-600 mb-2">No listings yet</h3>
+              <p className="text-slate-400 text-sm mb-5">Be the first to post an ad!</p>
+              <button onClick={() => navigate('/sell')} className="btn-secondary">Post Free Ad</button>
+            </div>
+          ) : !error && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {all.map(p => <ProductCard key={p.id} product={p} />)}
+              </div>
+
+              {/* ✅ NEW: Load more button */}
+              {hasMore && (
+                <div className="flex justify-center mt-8">
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="btn-secondary px-8 py-3 flex items-center gap-2 disabled:opacity-60"
+                  >
+                    {loadingMore
+                      ? <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      : <ChevronDown size={16} />}
+                    {loadingMore ? 'Loading...' : 'Load More'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* Sell CTA */}
+        {!error && (
+          <div className="rounded-3xl bg-gradient-to-br from-orange-500 to-orange-700 p-8 sm:p-12 text-white">
+            <div className="flex items-center gap-2 mb-3">
+              <Tag size={18} className="text-orange-200" />
+              <span className="text-orange-200 font-bold text-sm">Sell instantly</span>
+            </div>
+            <h2 className="font-black text-3xl sm:text-4xl mb-3">Got something to sell?</h2>
+            <p className="text-orange-100 text-lg mb-6">Post your ad in 60 seconds. Reach thousands of buyers.</p>
+            <Link to="/sell" className="inline-flex items-center gap-2 bg-white text-orange-700 font-black px-6 py-3 rounded-xl hover:bg-orange-50 transition-colors shadow">
+              Post Free Ad <ArrowRight size={16} />
+            </Link>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\LoginPage.jsx =====  
+import { useState } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import toast from 'react-hot-toast'
+
+export default function LoginPage() {
+  const { login }  = useAuth()
+  const navigate   = useNavigate()
+  const location   = useLocation()
+  const from       = location.state?.from?.pathname || '/'
+
+  const [email,   setEmail]   = useState('')
+  const [pass,    setPass]    = useState('')
+  const [showPw,  setShowPw]  = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [errors,  setErrors]  = useState({})
+
+  const validate = () => {
+    const e = {}
+    if (!email.trim()) e.email = 'Email required'
+    else if (!/\S+@\S+\.\S+/.test(email)) e.email = 'Invalid email'
+    if (!pass) e.pass = 'Password required'
+    setErrors(e)
+    return !Object.keys(e).length
+  }
+
+  const handle = async ev => {
+    ev.preventDefault()
+    if (!validate()) return
+    setLoading(true)
+    try {
+      await login(email, pass)
+      toast.success('Welcome back!')
+      navigate(from, { replace: true })
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Invalid credentials')
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md page-fade">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-700 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4">
+            <span className="text-white font-black text-2xl">T</span>
+          </div>
+          <h1 className="font-black text-2xl text-slate-900">Welcome back</h1>
+          <p className="text-slate-500 text-sm mt-1">Sign in to your TradeNest account</p>
+        </div>
+
+        <div className="card p-7">
+          <form onSubmit={handle} noValidate className="space-y-4">
+            <div>
+              <label className="label">Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className={`input ${errors.email ? 'ring-2 ring-red-400 border-red-300' : ''}`} />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            </div>
+            <div>
+              <label className="label">Password</label>
+              <div className="relative">
+                <input type={showPw ? 'text' : 'password'} value={pass} onChange={e => setPass(e.target.value)}
+                  placeholder="Your password"
+                  className={`input pr-10 ${errors.pass ? 'ring-2 ring-red-400 border-red-300' : ''}`} />
+                <button type="button" onClick={() => setShowPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {errors.pass && <p className="text-red-500 text-xs mt-1">{errors.pass}</p>}
+            </div>
+            <button type="submit" disabled={loading} className="btn-primary w-full py-3 disabled:opacity-60">
+              {loading
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : 'Sign In'}
+            </button>
+          </form>
+          <p className="text-center text-sm text-slate-500 mt-5">
+            No account?{' '}
+            <Link to="/register" className="text-orange-600 font-bold hover:underline">Register free</Link>
+          </p>
+        </div>
+
+        <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl text-sm">
+          <p className="font-bold text-orange-800 mb-1">Demo accounts</p>
+          <p className="text-orange-700">seller1@tn.com / password123</p>
+          <p className="text-orange-700">seller2@tn.com / password123</p>
+          <p className="text-orange-700">seller3@tn.com / password123</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\MyListingsPage.jsx =====  
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Package, Plus, Edit2, Trash2, Eye, MapPin, CheckCircle, Tag } from 'lucide-react'
+import { productsAPI, getProductImage, fmtPrice, CATEGORY_IMAGES } from '../api'
+import toast from 'react-hot-toast'
+
+const STATUS_CLS = {
+  ACTIVE:  'bg-green-100 text-green-700',
+  SOLD:    'bg-blue-100 text-blue-700',
+  EXPIRED: 'bg-slate-100 text-slate-500',
+}
+
+export default function MyListingsPage() {
+  const navigate = useNavigate()
+  const [products, setProducts] = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [deleting, setDeleting] = useState(null)
+  const [selling,  setSelling]  = useState(null)
+  const [filter,   setFilter]   = useState('ALL') // ALL | ACTIVE | SOLD | EXPIRED
+
+  const load = () => {
+    setLoading(true)
+    productsAPI.getMy()
+      .then(r => setProducts(r.data.data || []))
+      .catch(() => toast.error('Failed to load listings'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  const handleDelete = async id => {
+    if (!window.confirm('Remove this listing? It will be marked as expired.')) return
+    setDeleting(id)
+    try {
+      await productsAPI.delete(id)
+      toast.success('Listing removed')
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, status: 'EXPIRED' } : p))
+    } catch { toast.error('Could not remove listing') }
+    finally  { setDeleting(null) }
+  }
+
+  // ✅ NEW: mark as sold
+  const handleMarkSold = async id => {
+    if (!window.confirm('Mark this item as sold?')) return
+    setSelling(id)
+    try {
+      await productsAPI.markAsSold(id)
+      toast.success('Marked as sold!')
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, status: 'SOLD' } : p))
+    } catch { toast.error('Could not update status') }
+    finally  { setSelling(null) }
+  }
+
+  const tabs = [
+    { key: 'ALL',     label: `All (${products.length})` },
+    { key: 'ACTIVE',  label: `Active (${products.filter(p => p.status === 'ACTIVE').length})` },
+    { key: 'SOLD',    label: `Sold (${products.filter(p => p.status === 'SOLD').length})` },
+    { key: 'EXPIRED', label: `Removed (${products.filter(p => p.status === 'EXPIRED').length})` },
+  ]
+
+  const displayed = filter === 'ALL' ? products : products.filter(p => p.status === filter)
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-10">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+            <Package size={20} className="text-blue-600" />
+          </div>
+          <div>
+            <h1 className="font-black text-2xl text-slate-900">My Listings</h1>
+            <p className="text-slate-400 text-sm">{products.length} total ads</p>
+          </div>
+        </div>
+        <Link to="/sell" className="btn-primary"><Plus size={15} /> Post New Ad</Link>
+      </div>
+
+      {/* Status tabs */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6 flex-wrap">
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setFilter(t.key)}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+              filter === t.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}>{t.label}</button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="card p-5 flex gap-4">
+              <div className="skeleton w-20 h-16 rounded-xl" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton h-5 w-48 rounded" />
+                <div className="skeleton h-4 w-24 rounded" />
+                <div className="skeleton h-3 w-32 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : displayed.length === 0 ? (
+        <div className="text-center py-24">
+          <Package size={64} className="text-slate-200 mx-auto mb-4" />
+          <h3 className="font-bold text-xl text-slate-600 mb-2">
+            {filter === 'ALL' ? 'No listings yet' : `No ${filter.toLowerCase()} listings`}
+          </h3>
+          <p className="text-slate-400 text-sm mb-6">Post your first ad and start selling</p>
+          {filter === 'ALL' && <Link to="/sell" className="btn-primary">Post Free Ad</Link>}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {displayed.map(p => (
+            <ListingRow
+              key={p.id}
+              product={p}
+              onDelete={handleDelete}
+              onMarkSold={handleMarkSold}
+              deleting={deleting === p.id}
+              selling={selling === p.id}
+              onEdit={() => navigate(`/sell/edit/${p.id}`)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ListingRow({ product: p, onDelete, onMarkSold, deleting, selling, onEdit }) {
+  const [imgErr, setImgErr] = useState(false)
+  const isActive = p.status === 'ACTIVE'
+
+  return (
+    <div className="card p-4 flex gap-4 items-center hover:shadow-md transition-shadow">
+      <Link to={`/product/${p.id}`} className="shrink-0">
+        <div className="w-20 h-16 rounded-xl overflow-hidden bg-slate-100">
+          <img
+            src={imgErr ? CATEGORY_IMAGES.default : getProductImage(p)}
+            alt={p.title}
+            className="w-full h-full object-cover hover:scale-105 transition-transform"
+            onError={() => setImgErr(true)}
+          />
+        </div>
+      </Link>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <Link to={`/product/${p.id}`}
+            className="font-bold text-slate-800 hover:text-orange-500 transition-colors text-sm truncate max-w-xs">
+            {p.title}
+          </Link>
+          <span className={`badge shrink-0 ${STATUS_CLS[p.status] || STATUS_CLS.EXPIRED}`}>
+            {p.status}
+          </span>
+        </div>
+        <p className="font-black text-orange-500 mt-1 text-sm">{fmtPrice(p.price)}</p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 mt-1 text-xs text-slate-400">
+          <span className="flex items-center gap-1"><MapPin size={10} />{p.city}</span>
+          <span className="flex items-center gap-1"><Eye size={10} />{p.viewCount} views</span>
+          {p.categoryName && <span className="flex items-center gap-1"><Tag size={10} />{p.categoryName}</span>}
+          {p.featured && <span className="text-orange-500 font-semibold">⭐ Featured</span>}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+        {/* Mark as sold — only for ACTIVE listings */}
+        {isActive && (
+          <button
+            onClick={() => onMarkSold(p.id)}
+            disabled={selling}
+            title="Mark as Sold"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-green-200 text-green-600 hover:bg-green-50 disabled:opacity-50 transition-colors"
+          >
+            {selling
+              ? <span className="w-3 h-3 border border-green-600 border-t-transparent rounded-full animate-spin" />
+              : <CheckCircle size={13} />}
+            Sold
+          </button>
+        )}
+
+        {isActive && (
+          <button onClick={onEdit} title="Edit"
+            className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 hover:border-orange-400 hover:text-orange-500 transition-colors">
+            <Edit2 size={14} />
+          </button>
+        )}
+
+        <button onClick={() => onDelete(p.id)} disabled={deleting || !isActive} title="Remove"
+          className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 hover:border-red-400 hover:text-red-500 transition-colors disabled:opacity-40">
+          {deleting
+            ? <span className="w-3 h-3 border border-slate-400 border-t-transparent rounded-full animate-spin" />
+            : <Trash2 size={14} />}
+        </button>
+      </div>
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\NotFoundPage.jsx =====  
+import { Link } from 'react-router-dom'
+import { ArrowLeft, Home } from 'lucide-react'
+
+export default function NotFoundPage() {
+  return (
+    <div className="min-h-[70vh] flex items-center justify-center px-4">
+      <div className="text-center page-fade">
+        <p className="font-black text-9xl text-slate-200 leading-none select-none">404</p>
+        <h1 className="font-black text-2xl text-slate-900 mt-2 mb-3">Page not found</h1>
+        <p className="text-slate-400 text-sm mb-8 max-w-sm mx-auto">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <button onClick={() => window.history.back()} className="btn-secondary">
+            <ArrowLeft size={15} /> Go Back
+          </button>
+          <Link to="/" className="btn-primary">
+            <Home size={15} /> Home
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\OffersPage.jsx =====  
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { Tag, Check, X, ArrowUpDown } from 'lucide-react'
+import { offersAPI, fmtPrice } from '../api'
+import toast from 'react-hot-toast'
+
+const STATUS = {
+  PENDING:   { label: 'Pending',   cls: 'bg-amber-100 text-amber-800'  },
+  ACCEPTED:  { label: 'Accepted',  cls: 'bg-green-100 text-green-800'  },
+  REJECTED:  { label: 'Rejected',  cls: 'bg-red-100 text-red-700'      },
+  COUNTERED: { label: 'Countered', cls: 'bg-blue-100 text-blue-800'    },
+}
+
+export default function OffersPage() {
+  const [tab,     setTab]     = useState('received')
+  const [rec,     setRec]     = useState([])
+  const [mine,    setMine]    = useState([])
+  const [loading, setLoading] = useState(true)
+  const [acting,  setActing]  = useState(null)
+
+  const load = () => {
+    setLoading(true)
+    Promise.all([offersAPI.getReceived(), offersAPI.getMine()])
+      .then(([r, m]) => { setRec(r.data.data || []); setMine(m.data.data || []) })
+      .catch(() => toast.error('Failed to load offers'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  const act = async (fn, id, label) => {
+    setActing(id)
+    try { await fn(id); toast.success(label); load() }
+    catch (e) { toast.error(e?.response?.data?.message || 'Action failed') }
+    finally   { setActing(null) }
+  }
+
+  const offers = tab === 'received' ? rec : mine
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-10">
+      <div className="flex items-center gap-3 mb-7">
+        <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+          <Tag size={20} className="text-purple-600" />
+        </div>
+        <div>
+          <h1 className="font-black text-2xl text-slate-900">Offers</h1>
+          <p className="text-slate-400 text-sm">Manage your price negotiations</p>
+        </div>
+      </div>
+
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6">
+        {[['received', `Received (${rec.length})`], ['mine', `Sent (${mine.length})`]].map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)}
+            className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
+              tab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="card p-5 flex gap-4">
+              <div className="skeleton w-12 h-12 rounded-xl" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton h-4 w-32 rounded" /><div className="skeleton h-5 w-24 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : offers.length === 0 ? (
+        <div className="text-center py-20">
+          <Tag size={48} className="text-slate-200 mx-auto mb-4" />
+          <h3 className="font-bold text-xl text-slate-600 mb-2">No offers yet</h3>
+          <p className="text-slate-400 text-sm">
+            {tab === 'received' ? 'Offers from buyers will appear here' : 'Your sent offers will appear here'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {offers.map(offer => {
+            const st   = STATUS[offer.status] || STATUS.PENDING
+            const busy = acting === offer.id
+            return (
+              <div key={offer.id} className="card p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex gap-4 flex-1 min-w-0">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl flex items-center justify-center shrink-0">
+                      <Tag size={20} className="text-purple-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <Link to={`/product/${offer.productId}`}
+                        className="text-sm font-bold text-slate-700 hover:text-orange-500 transition-colors">
+                        Product #{offer.productId}
+                      </Link>
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        <span className="font-black text-xl text-slate-900">{fmtPrice(offer.amount)}</span>
+                        {offer.counterAmount && (
+                          <span className="text-sm text-blue-600 flex items-center gap-1">
+                            <ArrowUpDown size={12} /> Counter: {fmtPrice(offer.counterAmount)}
+                          </span>
+                        )}
+                      </div>
+                      {offer.message && (
+                        <p className="text-xs text-slate-400 mt-1 italic">"{offer.message}"</p>
+                      )}
+                      {tab === 'received' && offer.status === 'PENDING' && (
+                        <div className="flex gap-2 mt-3">
+                          <button onClick={() => act(offersAPI.accept, offer.id, 'Offer accepted!')}
+                            disabled={busy}
+                            className="flex items-center gap-1.5 px-4 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-60">
+                            {busy ? <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" /> : <Check size={12} />}
+                            Accept
+                          </button>
+                          <button onClick={() => act(offersAPI.reject, offer.id, 'Offer rejected')}
+                            disabled={busy}
+                            className="flex items-center gap-1.5 px-4 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-60">
+                            {busy ? <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" /> : <X size={12} />}
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`badge shrink-0 ${st.cls}`}>{st.label}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\ProductDetailPage.jsx =====  
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import {
+  ArrowLeft, Heart, Share2, MapPin, Clock, Eye, Shield,
+  MessageCircle, Tag, Star, ChevronLeft, ChevronRight,
+  User, Package, CheckCircle,
+} from 'lucide-react'
+import {
+  productsAPI, reviewsAPI, messagesAPI,
+  getProductImage, fmtPrice, IMG_HOST, CATEGORY_IMAGES,
+} from '../api'
+import { useAuth }     from '../context/AuthContext'
+import { useWishlist } from '../context/WishlistContext'
+import { formatDistanceToNow } from 'date-fns'
+import toast from 'react-hot-toast'
+import MakeOfferModal from '../features/offers/MakeOfferModal'
+import ProductCard    from '../components/ProductCard'
+
+const CONDITION_LABELS = {
+  NEW:      { label: 'New',       cls: 'bg-green-100 text-green-700' },
+  LIKE_NEW: { label: 'Like New',  cls: 'bg-teal-100 text-teal-700' },
+  GOOD:     { label: 'Good',      cls: 'bg-blue-100 text-blue-700' },
+  FAIR:     { label: 'Fair',      cls: 'bg-amber-100 text-amber-700' },
+}
+
+function parseImages(product) {
+  if (!product) return []
+  const raw = product.images
+  if (!raw || raw === 'sample.jpg' || !raw.trim()) {
+    return [CATEGORY_IMAGES[product.categorySlug] || CATEGORY_IMAGES.default]
+  }
+  const urls = raw.split(',').map(f => {
+    const c = f.trim()
+    if (!c) return null
+    if (c.startsWith('http')) return c
+    return `${IMG_HOST}/uploads/${c.replace(/^\/uploads\//, '')}`
+  }).filter(Boolean)
+  return urls.length
+    ? urls
+    : [CATEGORY_IMAGES[product.categorySlug] || CATEGORY_IMAGES.default]
+}
+
+export default function ProductDetailPage() {
+  const { id }     = useParams()
+  const navigate   = useNavigate()
+  const { user, isAuthenticated } = useAuth()
+  const { isWishlisted, isToggling, toggle } = useWishlist()
+
+  const [product,   setProduct]   = useState(null)
+  const [reviews,   setReviews]   = useState([])
+  const [stats,     setStats]     = useState(null)
+  const [related,   setRelated]   = useState([])
+  const [loading,   setLoading]   = useState(true)
+  const [imgIdx,    setImgIdx]    = useState(0)
+  const [imgErrors, setImgErrors] = useState({})
+  const [showOffer, setShowOffer] = useState(false)
+  const [chatBusy,  setChatBusy]  = useState(false)
+
+  useEffect(() => {
+    setLoading(true); setImgIdx(0); setImgErrors({})
+    productsAPI.getById(id)
+      .then(r => {
+        const p = r.data.data
+        setProduct(p)
+        if (p?.sellerId) {
+          Promise.all([
+            reviewsAPI.getBySeller(p.sellerId).catch(() => ({ data: { data: [] } })),
+            reviewsAPI.getStats(p.sellerId).catch(() => null),
+          ]).then(([rR, sR]) => {
+            setReviews(rR.data.data || [])
+            if (sR) setStats(sR.data.data)
+          })
+        }
+        // ✅ NEW: Load related listings (same category, different product)
+        if (p?.categorySlug) {
+          productsAPI.getByCategory(p.categorySlug, 0, 8)
+            .then(cr => {
+              const others = (cr.data.data?.content || []).filter(x => x.id !== p.id)
+              setRelated(others.slice(0, 4))
+            }).catch(() => {})
+        }
+      })
+      .catch(() => toast.error('Product not found'))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  const images     = parseImages(product)
+  const wishlisted = product ? isWishlisted(product.id) : false
+  const toggling   = product ? isToggling(product.id)   : false
+  const isOwn      = user?.id === product?.sellerId
+
+  const handleChat = async () => {
+    if (!isAuthenticated) { navigate('/login'); return }
+    if (isOwn) { toast.error("That's your own listing"); return }
+    setChatBusy(true)
+    try {
+      await messagesAPI.startConversation({
+        productId: product.id,
+        sellerId:  product.sellerId,
+        message:   `Hi! I'm interested in "${product.title}"`,
+      })
+    } catch {}
+    finally { setChatBusy(false) }
+    navigate('/chat')
+  }
+
+  const handleShare = () => {
+    const url = window.location.href
+    if (navigator.share) navigator.share({ title: product?.title, url }).catch(() => {})
+    else { navigator.clipboard?.writeText(url); toast.success('Link copied!') }
+  }
+
+  const imgSrc = i =>
+    imgErrors[i]
+      ? (CATEGORY_IMAGES[product?.categorySlug] || CATEGORY_IMAGES.default)
+      : images[i]
+
+  const sellerAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(product?.sellerName || 'U')}&background=f97316&color=fff&size=64&bold=true`
+  const conditionInfo = product?.condition ? CONDITION_LABELS[product.condition] : null
+
+  if (loading) return (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="skeleton aspect-[4/3] rounded-2xl" />
+          <div className="skeleton h-8 w-48 rounded" />
+          <div className="skeleton h-5 w-full rounded" />
+        </div>
+        <div className="space-y-4"><div className="skeleton h-48 rounded-2xl" /></div>
+      </div>
+    </div>
+  )
+
+  if (!product) return (
+    <div className="text-center py-24">
+      <div className="text-6xl mb-4">😕</div>
+      <h2 className="font-black text-2xl text-slate-700 mb-4">Product not found</h2>
+      <button onClick={() => navigate('/')} className="btn-primary">Go Home</button>
+    </div>
+  )
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8 page-fade">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-slate-400 mb-5">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-1 hover:text-orange-500 transition-colors">
+          <ArrowLeft size={15} /> Back
+        </button>
+        <span>/</span>
+        <Link to={`/category/${product.categorySlug}`} className="hover:text-orange-500 transition-colors">
+          {product.categoryName}
+        </Link>
+        <span>/</span>
+        <span className="text-slate-700 truncate max-w-[200px]">{product.title}</span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* LEFT */}
+        <div className="lg:col-span-2 space-y-5">
+          {/* Gallery */}
+          <div className="card overflow-hidden">
+            <div className="relative aspect-[4/3] bg-slate-100">
+              <img
+                src={imgSrc(imgIdx)} alt={product.title}
+                className="w-full h-full object-cover"
+                onError={() => setImgErrors(p => ({ ...p, [imgIdx]: true }))}
+              />
+              {images.length > 1 && (
+                <>
+                  <button onClick={() => setImgIdx(i => (i - 1 + images.length) % images.length)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition-colors">
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button onClick={() => setImgIdx(i => (i + 1) % images.length)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow hover:bg-white transition-colors">
+                    <ChevronRight size={18} />
+                  </button>
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {images.map((_, i) => (
+                      <button key={i} onClick={() => setImgIdx(i)}
+                        className={`w-2 h-2 rounded-full transition-colors ${i === imgIdx ? 'bg-white' : 'bg-white/50'}`} />
+                    ))}
+                  </div>
+                </>
+              )}
+              {product.featured && (
+                <span className="absolute top-3 left-3 badge bg-orange-500 text-white">⭐ Featured</span>
+              )}
+            </div>
+            {images.length > 1 && (
+              <div className="flex gap-2 p-3 overflow-x-auto">
+                {images.map((_, i) => (
+                  <button key={i} onClick={() => setImgIdx(i)}
+                    className={`shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-colors ${
+                      i === imgIdx ? 'border-orange-500' : 'border-transparent hover:border-slate-300'
+                    }`}>
+                    <img src={imgSrc(i)} alt="" className="w-full h-full object-cover"
+                      onError={() => setImgErrors(p => ({ ...p, [i]: true }))} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Info */}
+          <div className="card p-6">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <p className="font-black text-3xl text-slate-900">{fmtPrice(product.price)}</p>
+                <h1 className="text-lg font-bold text-slate-800 mt-1">{product.title}</h1>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => !toggling && toggle(product.id)} disabled={toggling}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${
+                    wishlisted ? 'bg-red-50 border-red-200 text-red-500' : 'border-slate-200 text-slate-400 hover:border-red-200 hover:text-red-500'
+                  }`}>
+                  <Heart size={18} className={wishlisted ? 'fill-red-500' : ''} />
+                </button>
+                <button onClick={handleShare}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 text-slate-400 hover:border-orange-300 hover:text-orange-500 transition-all">
+                  <Share2 size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 text-sm text-slate-400 pb-5 border-b border-slate-100 mb-5">
+              <span className="flex items-center gap-1.5"><MapPin size={13} className="text-orange-500" />{product.city}, {product.state}</span>
+              <span className="flex items-center gap-1.5">
+                <Clock size={13} />
+                {product.postedDate ? formatDistanceToNow(new Date(product.postedDate), { addSuffix: true }) : ''}
+              </span>
+              {product.viewCount > 0 && (
+                <span className="flex items-center gap-1.5"><Eye size={13} />{product.viewCount} views</span>
+              )}
+              {product.categoryName && (
+                <span className="flex items-center gap-1.5"><Tag size={13} />{product.categoryName}</span>
+              )}
+              {/* ✅ NEW: Condition badge */}
+              {conditionInfo && (
+                <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${conditionInfo.cls}`}>
+                  <CheckCircle size={11} /> {conditionInfo.label}
+                </span>
+              )}
+            </div>
+
+            <h3 className="font-bold text-slate-800 mb-2 text-sm">Description</h3>
+            <p className="text-slate-500 text-sm leading-relaxed whitespace-pre-line">
+              {product.description || 'No description provided.'}
+            </p>
+          </div>
+
+          {/* Safety tips */}
+          <div className="card p-5 border-l-4 border-l-orange-400 rounded-l-none">
+            <div className="flex items-center gap-2 mb-2">
+              <Shield size={17} className="text-orange-500" />
+              <h3 className="font-bold text-slate-900 text-sm">Safety Tips</h3>
+            </div>
+            <ul className="text-sm text-slate-500 space-y-1.5">
+              {[
+                'Meet in a safe, public location',
+                'Check the item before paying',
+                'Never pay in advance or send money online',
+                'Beware of deals that seem too good to be true',
+              ].map(t => (
+                <li key={t} className="flex items-start gap-2">
+                  <span className="text-orange-400 mt-0.5 shrink-0">•</span>{t}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Reviews */}
+          {reviews.length > 0 && (
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-slate-900">Seller Reviews</h3>
+                {stats && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex">
+                      {[1,2,3,4,5].map(s => (
+                        <Star key={s} size={14} className={s <= Math.round(stats.averageRating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} />
+                      ))}
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">{stats.averageRating}</span>
+                    <span className="text-xs text-slate-400">({stats.totalReviews})</span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-4">
+                {reviews.slice(0, 5).map(r => (
+                  <div key={r.id} className="flex gap-3">
+                    <img src="https://ui-avatars.com/api/?name=User&background=e2e8f0&color=64748b&size=32&bold=true" alt="" className="w-8 h-8 rounded-full shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <div className="flex">
+                          {[1,2,3,4,5].map(s => (
+                            <Star key={s} size={11} className={s <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} />
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {r.createdAt ? formatDistanceToNow(new Date(r.createdAt), { addSuffix: true }) : ''}
+                        </span>
+                      </div>
+                      {r.comment && <p className="text-sm text-slate-600">{r.comment}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ✅ NEW: Related listings */}
+          {related.length > 0 && (
+            <div>
+              <h3 className="font-black text-xl text-slate-900 mb-4">Similar Listings</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {related.map(p => <ProductCard key={p.id} product={p} />)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT — Seller card */}
+        <div className="space-y-4">
+          <div className="card p-5 sticky top-20">
+            <p className="font-black text-2xl text-slate-900 mb-1">{fmtPrice(product.price)}</p>
+            <p className="text-sm text-slate-500 mb-4">{product.title}</p>
+
+            {!isOwn ? (
+              <div className="space-y-2.5">
+                <button onClick={handleChat} disabled={chatBusy}
+                  className="btn-primary w-full justify-center py-3 disabled:opacity-60">
+                  {chatBusy
+                    ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : <><MessageCircle size={16} /> Chat with Seller</>}
+                </button>
+                {isAuthenticated && (
+                  <button onClick={() => setShowOffer(true)}
+                    className="btn-secondary w-full justify-center py-3">
+                    <Tag size={16} /> Make an Offer
+                  </button>
+                )}
+              </div>
+            ) : (
+              <Link to={`/sell/edit/${product.id}`}
+                className="btn-secondary w-full justify-center py-3 flex items-center gap-2">
+                <Package size={16} /> Edit Listing
+              </Link>
+            )}
+
+            <div className="border-t border-slate-100 my-4" />
+
+            {/* Seller info — ✅ FIX: link now goes to /seller/:id */}
+            <div className="flex items-center gap-3">
+              <img src={sellerAvatar} alt={product.sellerName}
+                className="w-12 h-12 rounded-xl object-cover border border-slate-100" />
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-slate-800 text-sm truncate">{product.sellerName}</p>
+                <p className="text-xs text-slate-400 flex items-center gap-1">
+                  <MapPin size={10} />{product.sellerCity}
+                </p>
+                {product.sellerVerified && (
+                  <span className="badge bg-green-100 text-green-700 text-[10px] mt-0.5">✓ Verified</span>
+                )}
+              </div>
+              {/* ✅ FIX: correct route /seller/:id */}
+              <Link to={`/seller/${product.sellerId}`}
+                className="btn-ghost text-xs px-3 py-1.5 shrink-0">
+                <User size={12} /> Profile
+              </Link>
+            </div>
+
+            {stats && stats.totalReviews > 0 && (
+              <div className="mt-3 flex items-center gap-2">
+                <div className="flex">
+                  {[1,2,3,4,5].map(s => (
+                    <Star key={s} size={12} className={s <= Math.round(stats.averageRating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} />
+                  ))}
+                </div>
+                <span className="text-xs text-slate-500">
+                  {stats.averageRating} · {stats.totalReviews} review{stats.totalReviews !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showOffer && <MakeOfferModal product={product} onClose={() => setShowOffer(false)} />}
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\ProfilePage.jsx =====  
+import { useState, useEffect } from 'react'
+import { User, Camera, Save, Lock, MapPin, Phone, Mail } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { authAPI, citiesAPI, uploadFile } from '../api'
+import toast from 'react-hot-toast'
+
+export default function ProfilePage() {
+  const { user, login } = useAuth()
+
+  const [cities,    setCities]    = useState([])
+  const [saving,    setSaving]    = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [tab,       setTab]       = useState('profile') // 'profile' | 'password'
+
+  const [form, setForm] = useState({
+    name: '', phone: '', city: '', state: '', avatarUrl: '',
+  })
+  const [pwForm, setPwForm] = useState({
+    currentPassword: '', newPassword: '', confirm: '',
+  })
+  const [pwErrors, setPwErrors] = useState({})
+
+  useEffect(() => {
+    if (user) {
+      setForm({
+        name:      user.name      || '',
+        phone:     user.phone     || '',
+        city:      user.city      || '',
+        state:     user.state     || '',
+        avatarUrl: user.avatarUrl || '',
+      })
+    }
+  }, [user])
+
+  useEffect(() => {
+    citiesAPI.getAll()
+      .then(r => setCities(r.data.data || []))
+      .catch(() => {})
+  }, [])
+
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const handleCity = e => {
+    const name  = e.target.value
+    const found = cities.find(c => c.city === name)
+    setForm(f => ({ ...f, city: name, state: found?.state || f.state }))
+  }
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Only image files allowed'); return }
+    setUploading(true)
+    try {
+      const res = await uploadFile(file)
+      const url = res.data.data || ''
+      setForm(f => ({ ...f, avatarUrl: url }))
+      toast.success('Photo uploaded!')
+    } catch {
+      toast.error('Upload failed')
+    } finally { setUploading(false) }
+  }
+
+  const handleSave = async e => {
+    e.preventDefault()
+    if (!form.name.trim()) { toast.error('Name is required'); return }
+    setSaving(true)
+    try {
+      const r = await authAPI.updateProfile({
+        name:      form.name.trim(),
+        phone:     form.phone.replace(/\D/g, ''),
+        city:      form.city,
+        state:     form.state,
+        avatarUrl: form.avatarUrl,
+      })
+      // Refresh user in context
+      const updated = r.data.data
+      localStorage.setItem('tn_user', JSON.stringify(updated))
+      window.dispatchEvent(new Event('tn:profile-updated'))
+      toast.success('Profile updated!')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Update failed')
+    } finally { setSaving(false) }
+  }
+
+  const handlePasswordChange = async e => {
+    e.preventDefault()
+    const errs = {}
+    if (!pwForm.currentPassword)              errs.currentPassword = 'Required'
+    if (pwForm.newPassword.length < 6)        errs.newPassword     = 'Min 6 characters'
+    if (pwForm.newPassword !== pwForm.confirm) errs.confirm         = 'Passwords do not match'
+    setPwErrors(errs)
+    if (Object.keys(errs).length) return
+    setSaving(true)
+    try {
+      // Re-login to verify current password, then update
+      await login(user.email, pwForm.currentPassword)
+      await authAPI.updateProfile({ password: pwForm.newPassword })
+      toast.success('Password changed!')
+      setPwForm({ currentPassword: '', newPassword: '', confirm: '' })
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Current password is incorrect')
+    } finally { setSaving(false) }
+  }
+
+  const avatarSrc = form.avatarUrl
+    ? (form.avatarUrl.startsWith('http')
+        ? form.avatarUrl
+        : `http://localhost:9000${form.avatarUrl.startsWith('/') ? '' : '/uploads/'}${form.avatarUrl}`)
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(form.name || 'U')}&background=f97316&color=fff&size=128&bold=true`
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-10">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
+          <User size={20} className="text-orange-600" />
+        </div>
+        <div>
+          <h1 className="font-black text-2xl text-slate-900">My Profile</h1>
+          <p className="text-slate-400 text-sm">Manage your account details</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6">
+        {[['profile', 'Profile Info'], ['password', 'Change Password']].map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)}
+            className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
+              tab === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'profile' && (
+        <div className="card p-6">
+          {/* Avatar */}
+          <div className="flex items-center gap-5 mb-8 pb-6 border-b border-slate-100">
+            <div className="relative">
+              <img
+                src={avatarSrc}
+                alt={form.name}
+                className="w-20 h-20 rounded-2xl object-cover border-2 border-orange-100"
+              />
+              <label className={`absolute -bottom-2 -right-2 w-8 h-8 bg-orange-500 text-white rounded-xl flex items-center justify-center cursor-pointer hover:bg-orange-600 transition-colors shadow ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                {uploading
+                  ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <Camera size={14} />}
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+              </label>
+            </div>
+            <div>
+              <p className="font-black text-lg text-slate-900">{user?.name}</p>
+              <p className="text-sm text-slate-400">{user?.email}</p>
+              {user?.verified && (
+                <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full mt-1 font-semibold">
+                  ✓ Verified account
+                </span>
+              )}
+            </div>
+          </div>
+
+          <form onSubmit={handleSave} className="space-y-4">
+            <div>
+              <label className="label">Full Name</label>
+              <div className="relative">
+                <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={form.name} onChange={set('name')} placeholder="Your name"
+                  className="input pl-10" required />
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Phone</label>
+              <div className="relative">
+                <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={form.phone} onChange={set('phone')} placeholder="10-digit mobile"
+                  maxLength={10} inputMode="numeric" className="input pl-10" />
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Email</label>
+              <div className="relative">
+                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={user?.email || ''} disabled className="input pl-10 opacity-60 cursor-not-allowed" />
+              </div>
+              <p className="text-xs text-slate-400 mt-1">Email cannot be changed</p>
+            </div>
+
+            <div>
+              <label className="label">City</label>
+              <div className="relative">
+                <MapPin size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <select value={form.city} onChange={handleCity} className="input pl-10">
+                  <option value="">Select city</option>
+                  {cities.map(c => (
+                    <option key={c.id} value={c.city}>{c.city}, {c.state}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" disabled={saving}
+              className="btn-primary w-full py-3 disabled:opacity-60 mt-2">
+              {saving
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <><Save size={15} /> Save Changes</>}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {tab === 'password' && (
+        <div className="card p-6">
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div>
+              <label className="label">Current Password</label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="password" value={pwForm.currentPassword}
+                  onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))}
+                  placeholder="Enter current password"
+                  className={`input pl-10 ${pwErrors.currentPassword ? 'ring-2 ring-red-400 border-red-300' : ''}`} />
+              </div>
+              {pwErrors.currentPassword && <p className="text-red-500 text-xs mt-1">{pwErrors.currentPassword}</p>}
+            </div>
+
+            <div>
+              <label className="label">New Password</label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="password" value={pwForm.newPassword}
+                  onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))}
+                  placeholder="Min 6 characters"
+                  className={`input pl-10 ${pwErrors.newPassword ? 'ring-2 ring-red-400 border-red-300' : ''}`} />
+              </div>
+              {pwErrors.newPassword && <p className="text-red-500 text-xs mt-1">{pwErrors.newPassword}</p>}
+            </div>
+
+            <div>
+              <label className="label">Confirm New Password</label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input type="password" value={pwForm.confirm}
+                  onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                  placeholder="Repeat new password"
+                  className={`input pl-10 ${pwErrors.confirm ? 'ring-2 ring-red-400 border-red-300' : ''}`} />
+              </div>
+              {pwErrors.confirm && <p className="text-red-500 text-xs mt-1">{pwErrors.confirm}</p>}
+            </div>
+
+            <button type="submit" disabled={saving}
+              className="btn-primary w-full py-3 disabled:opacity-60">
+              {saving
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <><Lock size={15} /> Change Password</>}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\RegisterPage.jsx =====  
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { citiesAPI } from '../api'
+import toast from 'react-hot-toast'
+
+export default function RegisterPage() {
+  const { register } = useAuth()
+  const navigate = useNavigate()
+
+  const [cities,  setCities]  = useState([])
+  const [showPw,  setShowPw]  = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [errors,  setErrors]  = useState({})
+  const [form,    setForm]    = useState({
+    name: '', email: '', password: '', phone: '', city: '', state: '',
+  })
+
+  useEffect(() => {
+    citiesAPI.getAll()
+      .then(r => setCities(r.data.data || []))
+      .catch(() => {
+        setCities([
+          { id: 1, city: 'Mumbai',    state: 'Maharashtra' },
+          { id: 2, city: 'Delhi',     state: 'Delhi'       },
+          { id: 3, city: 'Bangalore', state: 'Karnataka'   },
+          { id: 4, city: 'Hyderabad', state: 'Telangana'   },
+          { id: 5, city: 'Chennai',   state: 'Tamil Nadu'  },
+          { id: 6, city: 'Kolkata',   state: 'West Bengal' },
+          { id: 7, city: 'Pune',      state: 'Maharashtra' },
+          { id: 8, city: 'Ahmedabad', state: 'Gujarat'     },
+        ])
+      })
+  }, [])
+
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const handleCity = e => {
+    const name  = e.target.value
+    const found = cities.find(c => c.city === name)
+    setForm(f => ({ ...f, city: name, state: found?.state || '' }))
+  }
+
+  // ✅ FIX: strip non-digits for both validation AND what gets sent to the API
+  const cleanPhone = (raw) => raw.replace(/\D/g, '')
+
+  const validate = () => {
+    const e = {}
+    if (!form.name.trim())                       e.name     = 'Name required'
+    if (!form.email.trim())                      e.email    = 'Email required'
+    else if (!/\S+@\S+\.\S+/.test(form.email))  e.email    = 'Invalid email'
+    if (form.password.length < 6)                e.password = 'Min 6 characters'
+
+    // ✅ FIX: validate against cleaned digits, matching backend regex ^[6-9]\d{9}$
+    const digits = cleanPhone(form.phone)
+    if (!digits || digits.length !== 10)         e.phone = 'Enter valid 10-digit mobile number'
+    else if (!/^[6-9]/.test(digits))             e.phone = 'Number must start with 6, 7, 8 or 9'
+
+    if (!form.city)                              e.city = 'Select your city'
+    setErrors(e)
+    return !Object.keys(e).length
+  }
+
+  const handle = async ev => {
+    ev.preventDefault()
+    if (!validate()) return
+    setLoading(true)
+    try {
+      // ✅ FIX: send only clean digits to backend
+      await register({
+        ...form,
+        phone: cleanPhone(form.phone),
+        email: form.email.toLowerCase().trim(),
+      })
+      toast.success('Account created! Welcome to TradeNest 🎉')
+      navigate('/')
+    } catch (e) {
+      const msg = e?.response?.data?.message
+      toast.error(msg || 'Registration failed. Please try again.')
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md page-fade">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-700 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4">
+            <span className="text-white font-black text-2xl">T</span>
+          </div>
+          <h1 className="font-black text-2xl text-slate-900">Create account</h1>
+          <p className="text-slate-500 text-sm mt-1">Join India's fastest marketplace</p>
+        </div>
+
+        <div className="card p-7">
+          <form onSubmit={handle} noValidate className="space-y-4">
+
+            {/* Name + Phone row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Full Name</label>
+                <input
+                  value={form.name} onChange={set('name')}
+                  placeholder="Rahul Sharma"
+                  className={`input ${errors.name ? 'ring-2 ring-red-400 border-red-300' : ''}`}
+                />
+                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+              </div>
+              <div>
+                <label className="label">Phone</label>
+                <input
+                  value={form.phone} onChange={set('phone')}
+                  placeholder="9876543210"
+                  maxLength={10}
+                  inputMode="numeric"
+                  className={`input ${errors.phone ? 'ring-2 ring-red-400 border-red-300' : ''}`}
+                />
+                {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+              </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="label">Email</label>
+              <input
+                type="email" value={form.email} onChange={set('email')}
+                placeholder="you@example.com"
+                className={`input ${errors.email ? 'ring-2 ring-red-400 border-red-300' : ''}`}
+              />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="label">Password</label>
+              <div className="relative">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={form.password} onChange={set('password')}
+                  placeholder="Min 6 characters"
+                  className={`input pr-10 ${errors.password ? 'ring-2 ring-red-400 border-red-300' : ''}`}
+                />
+                <button type="button" onClick={() => setShowPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+            </div>
+
+            {/* City */}
+            <div>
+              <label className="label">City</label>
+              <select value={form.city} onChange={handleCity}
+                className={`input ${errors.city ? 'ring-2 ring-red-400 border-red-300' : ''}`}>
+                <option value="">Select your city</option>
+                {cities.map(c => (
+                  <option key={c.id} value={c.city}>{c.city}, {c.state}</option>
+                ))}
+              </select>
+              {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+              {cities.length === 0 && (
+                <p className="text-amber-600 text-xs mt-1 flex items-center gap-1">
+                  <AlertCircle size={11} /> Loading cities...
+                </p>
+              )}
+            </div>
+
+            <button type="submit" disabled={loading}
+              className="btn-primary w-full py-3 disabled:opacity-60">
+              {loading
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : 'Create Account'}
+            </button>
+          </form>
+
+          <p className="text-center text-sm text-slate-500 mt-5">
+            Already have an account?{' '}
+            <Link to="/login" className="text-orange-600 font-bold hover:underline">Sign in</Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\SearchPage.jsx =====  
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { productsAPI, categoriesAPI, citiesAPI } from '../api'
+import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
+
+const PAGE_SIZE = 20
+
+export default function SearchPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+
+  // Read filters from URL
+  const qParam        = searchParams.get('q')        || ''
+  const cityParam     = searchParams.get('city')     || ''
+  const categoryParam = searchParams.get('category') || ''
+  const minPriceParam = searchParams.get('minPrice') || ''
+  const maxPriceParam = searchParams.get('maxPrice') || ''
+  const sortParam     = searchParams.get('sort')     || 'latest'
+  const pageParam     = parseInt(searchParams.get('page') || '0', 10)
+
+  const [query,      setQuery]      = useState(qParam)
+  const [city,       setCity]       = useState(cityParam)
+  const [category,   setCategory]   = useState(categoryParam)
+  const [minPrice,   setMinPrice]   = useState(minPriceParam)
+  const [maxPrice,   setMaxPrice]   = useState(maxPriceParam)
+  const [sort,       setSort]       = useState(sortParam)
+
+  const [products,   setProducts]   = useState([])
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [loading,    setLoading]    = useState(false)
+  const [cats,       setCats]       = useState([])
+  const [cities,     setCities]     = useState([])
+  const [showFilter, setShowFilter] = useState(false)
+
+  useEffect(() => {
+    categoriesAPI.getAll().then(r => setCats(r.data.data || [])).catch(() => {})
+    citiesAPI.getAll().then(r => setCities(r.data.data || [])).catch(() => {})
+  }, [])
+
+  const doSearch = useCallback(() => {
+    if (!qParam && !cityParam && !categoryParam && !minPriceParam && !maxPriceParam) {
+      setProducts([]); setTotalItems(0); return
+    }
+    setLoading(true)
+    productsAPI.search({
+      q:        qParam        || undefined,
+      city:     cityParam     || undefined,
+      category: categoryParam || undefined,
+      minPrice: minPriceParam || undefined,
+      maxPrice: maxPriceParam || undefined,
+      page:     pageParam,
+      size:     PAGE_SIZE,
+    }).then(r => {
+      const data = r.data.data
+      let content = data.content || []
+      // Client-side sort on current page
+      if (sort === 'price_asc')  content = [...content].sort((a,b) => Number(a.price)-Number(b.price))
+      if (sort === 'price_desc') content = [...content].sort((a,b) => Number(b.price)-Number(a.price))
+      setProducts(content)
+      setTotalPages(data.totalPages || 1)
+      setTotalItems(data.totalElements || 0)
+    }).catch(() => {})
+      .finally(() => setLoading(false))
+  }, [qParam, cityParam, categoryParam, minPriceParam, maxPriceParam, pageParam, sort])
+
+  useEffect(() => { doSearch() }, [doSearch])
+
+  // Sync local state with URL
+  useEffect(() => {
+    setQuery(qParam); setCity(cityParam); setCategory(categoryParam)
+    setMinPrice(minPriceParam); setMaxPrice(maxPriceParam); setSort(sortParam)
+  }, [searchParams])
+
+  const applyFilters = (e) => {
+    e && e.preventDefault()
+    const p = {}
+    if (query.trim())   p.q        = query.trim()
+    if (city)           p.city     = city
+    if (category)       p.category = category
+    if (minPrice)       p.minPrice = minPrice
+    if (maxPrice)       p.maxPrice = maxPrice
+    if (sort !== 'latest') p.sort  = sort
+    p.page = 0
+    setSearchParams(p)
+    setShowFilter(false)
+  }
+
+  const clearAll = () => {
+    setQuery(''); setCity(''); setCategory('')
+    setMinPrice(''); setMaxPrice(''); setSort('latest')
+    setSearchParams({})
+  }
+
+  const goPage = (p) => {
+    const params = Object.fromEntries(searchParams.entries())
+    params.page = p
+    setSearchParams(params)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const activeFilters = [
+    cityParam     && `City: ${cityParam}`,
+    categoryParam && `Category: ${cats.find(c=>c.slug===categoryParam)?.name || categoryParam}`,
+    minPriceParam && `Min: ₹${minPriceParam}`,
+    maxPriceParam && `Max: ₹${maxPriceParam}`,
+  ].filter(Boolean)
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+
+      {/* Search bar */}
+      <form onSubmit={applyFilters} className="flex gap-2 mb-6">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search anything..."
+            className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+          />
+        </div>
+        <button type="submit" className="btn-primary px-6">Search</button>
+        <button type="button" onClick={() => setShowFilter(v => !v)}
+          className={`btn-secondary px-4 flex items-center gap-2 ${showFilter ? 'bg-orange-50 border-orange-300' : ''}`}>
+          <SlidersHorizontal size={16} />
+          <span className="hidden sm:inline">Filters</span>
+          {activeFilters.length > 0 && (
+            <span className="w-5 h-5 bg-orange-500 text-white text-[10px] font-black rounded-full flex items-center justify-center">
+              {activeFilters.length}
+            </span>
+          )}
+        </button>
+      </form>
+
+      {/* Filter panel */}
+      {showFilter && (
+        <div className="card p-5 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="label text-xs mb-1">Category</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="input py-2 text-sm">
+                <option value="">All categories</option>
+                {cats.map(c => <option key={c.id} value={c.slug}>{c.icon} {c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label text-xs mb-1">City</label>
+              <select value={city} onChange={e => setCity(e.target.value)} className="input py-2 text-sm">
+                <option value="">All cities</option>
+                {cities.map(c => <option key={c.id} value={c.city}>{c.city}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label text-xs mb-1">Min Price (₹)</label>
+              <input type="number" value={minPrice} onChange={e => setMinPrice(e.target.value)}
+                placeholder="0" className="input py-2 text-sm" min="0" />
+            </div>
+            <div>
+              <label className="label text-xs mb-1">Max Price (₹)</label>
+              <input type="number" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
+                placeholder="Any" className="input py-2 text-sm" min="0" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <div>
+              <label className="label text-xs mb-1">Sort by</label>
+              <select value={sort} onChange={e => setSort(e.target.value)} className="input py-2 text-sm w-auto">
+                <option value="latest">Latest first</option>
+                <option value="price_asc">Price: Low → High</option>
+                <option value="price_desc">Price: High → Low</option>
+              </select>
+            </div>
+            <div className="flex gap-2 mt-5 ml-auto">
+              <button type="button" onClick={clearAll} className="btn-secondary text-sm">Clear all</button>
+              <button type="button" onClick={applyFilters} className="btn-primary text-sm">Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active filter pills */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {activeFilters.map(f => (
+            <span key={f} className="flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full">
+              {f}
+            </span>
+          ))}
+          <button onClick={clearAll} className="flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full hover:bg-slate-200">
+            <X size={11} /> Clear all
+          </button>
+        </div>
+      )}
+
+      {/* Results header */}
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="font-black text-xl text-slate-900">
+          {qParam ? `Results for "${qParam}"` : 'All Listings'}
+          {!loading && <span className="ml-2 text-slate-400 font-normal text-base">({totalItems})</span>}
+        </h2>
+      </div>
+
+      {/* Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+        </div>
+      ) : !qParam && !cityParam && !categoryParam && !minPriceParam && !maxPriceParam ? (
+        <div className="text-center py-24">
+          <Search size={56} className="text-slate-200 mx-auto mb-4" />
+          <h3 className="font-bold text-xl text-slate-600 mb-2">Search for something</h3>
+          <p className="text-slate-400 text-sm">Type a keyword above to find listings</p>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="text-center py-24">
+          <div className="text-5xl mb-4">🔍</div>
+          <h3 className="font-bold text-xl text-slate-600 mb-2">No results found</h3>
+          <p className="text-slate-400 text-sm mb-5">Try different keywords or clear your filters</p>
+          <button onClick={clearAll} className="btn-secondary">Clear filters</button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {products.map(p => <ProductCard key={p.id} product={p} />)}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-10">
+          <button onClick={() => goPage(pageParam - 1)} disabled={pageParam === 0}
+            className="btn-ghost p-2 disabled:opacity-40"><ChevronLeft size={18} /></button>
+          {Array.from({ length: totalPages }, (_, i) => i)
+            .filter(i => i === 0 || i === totalPages-1 || Math.abs(i-pageParam) <= 1)
+            .reduce((acc, i, idx, arr) => {
+              if (idx > 0 && i - arr[idx-1] > 1) acc.push('…')
+              acc.push(i); return acc
+            }, [])
+            .map((item, idx) => item === '…'
+              ? <span key={`g${idx}`} className="px-2 text-slate-400">…</span>
+              : <button key={item} onClick={() => goPage(item)}
+                  className={`w-9 h-9 rounded-xl text-sm font-bold transition-colors ${
+                    item === pageParam ? 'bg-orange-500 text-white' : 'hover:bg-slate-100 text-slate-600'
+                  }`}>{item+1}</button>
+            )}
+          <button onClick={() => goPage(pageParam + 1)} disabled={pageParam >= totalPages-1}
+            className="btn-ghost p-2 disabled:opacity-40"><ChevronRight size={18} /></button>
+        </div>
+      )}
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\SellerprofilePage.jsx =====  
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { MapPin, Star, Package, MessageCircle, ArrowLeft, ShieldCheck } from 'lucide-react'
+import { productsAPI, reviewsAPI, messagesAPI } from '../api'
+import { useAuth } from '../context/AuthContext'
+import ProductCard, { ProductCardSkeleton } from '../components/ProductCard'
+import { formatDistanceToNow } from 'date-fns'
+import toast from 'react-hot-toast'
+
+export default function SellerProfilePage() {
+  const { id }     = useParams()
+  const navigate   = useNavigate()
+  const { user, isAuthenticated } = useAuth()
+
+  const [products, setProducts] = useState([])
+  const [reviews,  setReviews]  = useState([])
+  const [stats,    setStats]    = useState(null)
+  const [seller,   setSeller]   = useState(null)
+  const [loading,  setLoading]  = useState(true)
+  const [chatBusy, setChatBusy] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([
+      productsAPI.getBySeller(id),
+      reviewsAPI.getBySeller(id),
+      reviewsAPI.getStats(id),
+    ]).then(([pR, rR, sR]) => {
+      const prods = pR.data.data || []
+      setProducts(prods)
+      setReviews(rR.data.data  || [])
+      setStats(sR.data.data)
+      // Extract seller info from first product
+      if (prods.length > 0) {
+        setSeller({
+          id:        prods[0].sellerId,
+          name:      prods[0].sellerName,
+          city:      prods[0].sellerCity,
+          avatarUrl: prods[0].sellerAvatarUrl,
+          verified:  prods[0].sellerVerified,
+        })
+      }
+    }).catch(() => toast.error('Could not load seller'))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  const handleChat = async (productId) => {
+    if (!isAuthenticated) { navigate('/login'); return }
+    if (String(user?.id) === String(id)) { toast.error("That's your own profile"); return }
+    setChatBusy(true)
+    try {
+      await messagesAPI.startConversation({
+        productId,
+        sellerId: Number(id),
+        message:  `Hi! I'm interested in your listing.`,
+      })
+    } catch {}
+    finally { setChatBusy(false) }
+    navigate('/chat')
+  }
+
+  const avatar = seller?.avatarUrl
+    ? `http://localhost:9000/uploads/${seller.avatarUrl.replace(/^\/uploads\//, '')}`
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(seller?.name || 'S')}&background=f97316&color=fff&size=128&bold=true`
+
+  if (loading) return (
+    <div className="max-w-5xl mx-auto px-4 py-10">
+      <div className="skeleton h-48 rounded-2xl mb-6" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton aspect-[4/3] rounded-xl" />)}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <button onClick={() => navigate(-1)} className="btn-ghost p-2 mb-5">
+        <ArrowLeft size={20} />
+      </button>
+
+      {/* Seller banner */}
+      <div className="card p-6 mb-7">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+          <img src={avatar} alt={seller?.name}
+            className="w-20 h-20 rounded-2xl object-cover border-2 border-orange-100 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-black text-2xl text-slate-900">{seller?.name || 'Seller'}</h1>
+              {seller?.verified && (
+                <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-semibold">
+                  <ShieldCheck size={11} /> Verified
+                </span>
+              )}
+            </div>
+            {seller?.city && (
+              <p className="text-slate-400 text-sm flex items-center gap-1 mt-1">
+                <MapPin size={13} /> {seller.city}
+              </p>
+            )}
+            {stats && stats.totalReviews > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex">
+                  {[1,2,3,4,5].map(s => (
+                    <Star key={s} size={14} className={
+                      s <= Math.round(stats.averageRating)
+                        ? 'text-amber-400 fill-amber-400'
+                        : 'text-slate-200'
+                    } />
+                  ))}
+                </div>
+                <span className="text-sm font-bold text-slate-700">{stats.averageRating}</span>
+                <span className="text-xs text-slate-400">({stats.totalReviews} reviews)</span>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-3 flex-wrap shrink-0">
+            <div className="text-center px-4 py-2 bg-slate-50 rounded-xl">
+              <p className="font-black text-xl text-slate-900">{products.length}</p>
+              <p className="text-xs text-slate-400">Listings</p>
+            </div>
+            <div className="text-center px-4 py-2 bg-slate-50 rounded-xl">
+              <p className="font-black text-xl text-slate-900">{stats?.totalReviews || 0}</p>
+              <p className="text-xs text-slate-400">Reviews</p>
+            </div>
+            {isAuthenticated && String(user?.id) !== String(id) && (
+              <button
+                onClick={() => products.length && handleChat(products[0].id)}
+                disabled={chatBusy || !products.length}
+                className="btn-primary disabled:opacity-60"
+              >
+                {chatBusy
+                  ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <><MessageCircle size={15} /> Message</>}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Listings */}
+      <section className="mb-10">
+        <h2 className="font-black text-xl text-slate-900 mb-4 flex items-center gap-2">
+          <Package size={18} className="text-slate-400" /> Active Listings
+        </h2>
+        {products.length === 0 ? (
+          <div className="text-center py-12 text-slate-400">
+            <Package size={40} className="mx-auto mb-3 text-slate-200" />
+            <p className="font-semibold">No active listings</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {products.map(p => <ProductCard key={p.id} product={p} />)}
+          </div>
+        )}
+      </section>
+
+      {/* Reviews */}
+      {reviews.length > 0 && (
+        <section>
+          <h2 className="font-black text-xl text-slate-900 mb-4 flex items-center gap-2">
+            <Star size={18} className="text-amber-400 fill-amber-400" /> Reviews
+          </h2>
+          <div className="space-y-4">
+            {reviews.map(r => (
+              <div key={r.id} className="card p-4 flex gap-4">
+                <img
+                  src={`https://ui-avatars.com/api/?name=User&background=e2e8f0&color=64748b&size=40&bold=true`}
+                  alt="" className="w-10 h-10 rounded-full shrink-0"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex">
+                      {[1,2,3,4,5].map(s => (
+                        <Star key={s} size={12} className={
+                          s <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'
+                        } />
+                      ))}
+                    </div>
+                    <span className="text-xs text-slate-400">
+                      {r.createdAt
+                        ? formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })
+                        : ''}
+                    </span>
+                  </div>
+                  {r.comment && <p className="text-sm text-slate-600">{r.comment}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\SellPage.jsx =====  
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useDropzone } from 'react-dropzone'
+import { Upload, X, Check, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react'
+import { categoriesAPI, citiesAPI, productsAPI, uploadFile } from '../api'
+import toast from 'react-hot-toast'
+
+const STEPS = ['Category', 'Details', 'Photos', 'Pricing']
+
+const CONDITIONS = [
+  { value: 'NEW',      label: 'New',       desc: 'Brand new, unused' },
+  { value: 'LIKE_NEW', label: 'Like New',  desc: 'Used once or twice' },
+  { value: 'GOOD',     label: 'Good',      desc: 'Some signs of use' },
+  { value: 'FAIR',     label: 'Fair',      desc: 'Visible wear, fully working' },
+]
+
+export default function SellPage() {
+  const navigate = useNavigate()
+  const [step,       setStep]       = useState(0)
+  const [cats,       setCats]       = useState([])
+  const [cities,     setCities]     = useState([])
+  const [images,     setImages]     = useState([])
+  const [uploading,  setUploading]  = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [errors,     setErrors]     = useState({})
+  const [form,       setForm]       = useState({
+    categoryId: '', title: '', description: '', city: '', state: '',
+    price: '', featured: false, condition: 'GOOD',
+  })
+
+  useEffect(() => {
+    Promise.all([categoriesAPI.getAll(), citiesAPI.getAll()])
+      .then(([cR, ciR]) => {
+        setCats(cR.data.data   || [])
+        setCities(ciR.data.data || [])
+      }).catch(() => {})
+  }, [])
+
+  useEffect(() => () => images.forEach(i => URL.revokeObjectURL(i.preview)), [])
+
+  const set = k => e => { setForm(f => ({ ...f, [k]: e.target.value })); setErrors(er => ({ ...er, [k]: '' })) }
+
+  const handleCity = e => {
+    const name  = e.target.value
+    const found = cities.find(c => c.city === name)
+    setForm(f => ({ ...f, city: name, state: found?.state || '' }))
+    setErrors(er => ({ ...er, city: '' }))
+  }
+
+  const onDrop = useCallback(async accepted => {
+    const slots = 5 - images.length
+    const files = accepted.slice(0, slots)
+    if (!files.length) return
+    setUploading(true)
+    const results = []
+    for (const file of files) {
+      const preview = URL.createObjectURL(file)
+      try {
+        const res = await uploadFile(file)
+        const raw = res.data.data || ''
+        const serverUrl = raw.replace(/^\/uploads\//, '')
+        results.push({ preview, serverUrl })
+        toast.success(`Uploaded ${file.name}`)
+      } catch {
+        URL.revokeObjectURL(preview)
+        toast.error(`Failed to upload ${file.name}`)
+      }
+    }
+    setImages(prev => [...prev, ...results])
+    setUploading(false)
+  }, [images])
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
+    maxFiles: 5,
+    maxSize: 15 * 1024 * 1024,
+    disabled: images.length >= 5 || uploading,
+  })
+
+  const removeImage = i => {
+    URL.revokeObjectURL(images[i].preview)
+    setImages(prev => prev.filter((_, idx) => idx !== i))
+  }
+
+  const validateStep = () => {
+    if (step === 0 && !form.categoryId) { toast.error('Select a category'); return false }
+    if (step === 1) {
+      const e = {}
+      if (form.title.trim().length < 3)        e.title       = 'At least 3 characters'
+      if (form.description.trim().length < 10)  e.description = 'At least 10 characters'
+      if (!form.city)                           e.city        = 'Select a city'
+      setErrors(e)
+      return !Object.keys(e).length
+    }
+    if (step === 3 && (!form.price || parseFloat(form.price) <= 0)) {
+      toast.error('Enter a valid price'); return false
+    }
+    return true
+  }
+
+  const handleNext = () => { if (validateStep()) setStep(s => s + 1) }
+  const handleBack = () => setStep(s => s - 1)
+
+  const handleSubmit = async () => {
+    if (!validateStep()) return
+    setSubmitting(true)
+    try {
+      const imagesStr = images.map(i => i.serverUrl).filter(Boolean).join(',') || 'sample.jpg'
+      const payload = {
+        title:       form.title.trim(),
+        description: form.description.trim(),
+        price:       parseFloat(form.price),
+        city:        form.city,
+        state:       form.state,
+        featured:    form.featured,
+        images:      imagesStr,
+        condition:   form.condition,
+        category:    { id: parseInt(form.categoryId) },
+      }
+      const res   = await productsAPI.create(payload)
+      const newId = res.data.data?.id
+      toast.success('Your ad is live! 🚀')
+      navigate(newId ? `/product/${newId}` : '/my-listings')
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to post ad')
+    } finally { setSubmitting(false) }
+  }
+
+  const chosenCat = cats.find(c => c.id == form.categoryId)
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-10">
+      <div className="mb-8">
+        <h1 className="font-black text-3xl text-slate-900">Post an Ad</h1>
+        <p className="text-slate-400 text-sm mt-1">List your item for free in minutes</p>
+      </div>
+
+      {/* Stepper */}
+      <div className="flex items-center mb-8">
+        {STEPS.map((s, i) => (
+          <div key={s} className="flex items-center flex-1 last:flex-none">
+            <div className="flex flex-col items-center">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black transition-all ${
+                i < step   ? 'bg-orange-500 text-white' :
+                i === step  ? 'bg-slate-900 text-white' :
+                              'bg-slate-100 text-slate-400'
+              }`}>
+                {i < step ? <Check size={16} /> : i + 1}
+              </div>
+              <span className={`text-[10px] font-bold mt-1 ${i === step ? 'text-slate-900' : 'text-slate-400'}`}>{s}</span>
+            </div>
+            {i < STEPS.length - 1 && (
+              <div className={`flex-1 h-0.5 mx-2 mb-4 transition-colors ${i < step ? 'bg-orange-500' : 'bg-slate-200'}`} />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="card p-6 page-fade" key={step}>
+
+        {/* Step 0 – Category */}
+        {step === 0 && (
+          <div>
+            <h2 className="font-bold text-slate-900 mb-4 text-sm">Choose a category</h2>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              {cats.map(cat => (
+                <button key={cat.id} type="button"
+                  onClick={() => { setForm(f => ({ ...f, categoryId: cat.id })); setStep(1) }}
+                  className={`p-3.5 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:border-orange-400 hover:bg-orange-50 ${
+                    form.categoryId == cat.id ? 'border-orange-500 bg-orange-50' : 'border-slate-200'
+                  }`}>
+                  <span className="text-2xl">{cat.icon}</span>
+                  <span className="text-[10px] font-bold text-slate-600 text-center leading-tight">{cat.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 1 – Details */}
+        {step === 1 && (
+          <div className="space-y-4">
+            <h2 className="font-bold text-slate-900 mb-1 text-sm">Ad details</h2>
+            <div>
+              <label className="label">Title *</label>
+              <input value={form.title} onChange={set('title')} maxLength={100}
+                placeholder="e.g. Honda City 2022 – Single Owner"
+                className={`input ${errors.title ? 'ring-2 ring-red-400 border-red-300' : ''}`} />
+              <div className="flex justify-between mt-1">
+                {errors.title ? <p className="text-red-500 text-xs">{errors.title}</p> : <span />}
+                <p className="text-xs text-slate-400">{form.title.length}/100</p>
+              </div>
+            </div>
+            <div>
+              <label className="label">Description *</label>
+              <textarea value={form.description} onChange={set('description')} rows={5}
+                placeholder="Describe your item — condition, features, reason for selling..."
+                className={`input resize-none ${errors.description ? 'ring-2 ring-red-400 border-red-300' : ''}`} />
+              {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
+            </div>
+            {/* ✅ NEW: Condition field */}
+            <div>
+              <label className="label">Condition *</label>
+              <div className="grid grid-cols-2 gap-2">
+                {CONDITIONS.map(c => (
+                  <button key={c.value} type="button"
+                    onClick={() => setForm(f => ({ ...f, condition: c.value }))}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      form.condition === c.value
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-slate-200 hover:border-orange-300'
+                    }`}>
+                    <p className="font-bold text-sm text-slate-800">{c.label}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{c.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="label">City *</label>
+              <select value={form.city} onChange={handleCity}
+                className={`input ${errors.city ? 'ring-2 ring-red-400 border-red-300' : ''}`}>
+                <option value="">Select city</option>
+                {cities.map(c => <option key={c.id} value={c.city}>{c.city}, {c.state}</option>)}
+              </select>
+              {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+            </div>
+          </div>
+        )}
+
+        {/* Step 2 – Photos */}
+        {step === 2 && (
+          <div className="space-y-4">
+            <div className="flex items-start justify-between">
+              <h2 className="font-bold text-slate-900 text-sm">Add photos</h2>
+              <span className="text-xs text-slate-400 flex items-center gap-1">
+                <AlertCircle size={11} /> {5 - images.length} slots left
+              </span>
+            </div>
+            {images.length > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                {images.map((img, i) => (
+                  <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 group">
+                    <img src={img.preview} alt="" className="w-full h-full object-cover" />
+                    {i === 0 && (
+                      <span className="absolute bottom-1.5 left-1.5 badge bg-orange-500 text-white text-[9px]">Cover</span>
+                    )}
+                    <button onClick={() => removeImage(i)}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {images.length < 5 && (
+              <div {...getRootProps()}
+                className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all select-none ${
+                  isDragActive ? 'border-orange-400 bg-orange-50' : 'border-slate-200 hover:border-orange-300 hover:bg-slate-50'
+                } ${uploading ? 'pointer-events-none opacity-70' : ''}`}>
+                <input {...getInputProps()} />
+                <div className="flex flex-col items-center gap-3">
+                  {uploading
+                    ? <div className="w-7 h-7 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                    : <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center">
+                        <Upload size={22} className="text-orange-600" />
+                      </div>}
+                  <div>
+                    <p className="font-bold text-slate-700 text-sm">
+                      {uploading ? 'Uploading...' : isDragActive ? 'Drop here' : 'Drag & drop or click to upload'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">JPG, PNG, WEBP · max 15 MB</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-slate-400 flex items-center gap-1">
+              <AlertCircle size={11} /> Ads with photos get 5× more responses
+            </p>
+          </div>
+        )}
+
+        {/* Step 3 – Pricing */}
+        {step === 3 && (
+          <div className="space-y-5">
+            <h2 className="font-bold text-slate-900 mb-1 text-sm">Set your price</h2>
+            <div>
+              <label className="label">Price (₹) *</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">₹</span>
+                <input type="number" value={form.price} onChange={set('price')} min="0" placeholder="0"
+                  className="input pl-9 text-lg font-bold" />
+              </div>
+            </div>
+            <label className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-orange-300 cursor-pointer transition-colors">
+              <input type="checkbox" checked={form.featured}
+                onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))}
+                className="w-4 h-4 accent-orange-500" />
+              <div>
+                <p className="font-bold text-slate-800 text-sm">⭐ Feature my ad</p>
+                <p className="text-xs text-slate-400">Get highlighted placement in results</p>
+              </div>
+            </label>
+            {/* Summary */}
+            <div className="bg-slate-50 rounded-xl p-4 text-sm space-y-2">
+              <p className="font-bold text-slate-800 mb-2">Summary</p>
+              {[
+                ['Category',  chosenCat?.name || '—'],
+                ['Title',     form.title || '—'],
+                ['Condition', CONDITIONS.find(c => c.value === form.condition)?.label || '—'],
+                ['Location',  form.city || '—'],
+                ['Photos',    images.length],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between text-slate-500">
+                  <span>{k}</span>
+                  <span className="font-semibold text-slate-700 truncate ml-4 max-w-[200px]">{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <div className="flex gap-3 mt-7 pt-5 border-t border-slate-100">
+          {step > 0 && (
+            <button onClick={handleBack} className="btn-secondary flex-1">
+              <ChevronLeft size={16} /> Back
+            </button>
+          )}
+          {step < STEPS.length - 1 ? (
+            <button onClick={handleNext} className="btn-primary flex-1">
+              Continue <ChevronRight size={16} />
+            </button>
+          ) : (
+            <button onClick={handleSubmit} disabled={submitting}
+              className="btn-primary flex-1 disabled:opacity-60">
+              {submitting
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : 'Post Ad Free 🚀'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}===== C:\Users\Windows10\Downloads\tradenest-complete\tradenest\src\pages\WishlistPage.jsx =====  
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { Heart, Trash2, MapPin } from 'lucide-react'
+import { wishlistAPI, IMG_HOST, CATEGORY_IMAGES } from '../api'
+import { useWishlist } from '../context/WishlistContext'
+import toast from 'react-hot-toast'
+
+function itemImg(item) {
+  const raw = item.image
+  if (!raw || raw === 'sample.jpg' || !raw.trim()) return CATEGORY_IMAGES.default
+  const clean = raw.replace(/^\/uploads\//, '').trim()
+  if (clean.startsWith('http')) return clean
+  return `${IMG_HOST}/uploads/${clean}`
+}
+
+export default function WishlistPage() {
+  const [items,   setItems]   = useState([])
+  const [loading, setLoading] = useState(true)
+  const { toggle } = useWishlist()
+
+  const load = () => {
+    setLoading(true)
+    wishlistAPI.getAll()
+      .then(r => setItems(r.data.data || []))
+      .catch(() => toast.error('Failed to load wishlist'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  const handleRemove = async pid => {
+    const ok = await toggle(pid)
+    if (ok) setItems(prev => prev.filter(i => i.productId !== pid))
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-10">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
+          <Heart size={20} className="text-red-500 fill-red-500" />
+        </div>
+        <div>
+          <h1 className="font-black text-2xl text-slate-900">My Wishlist</h1>
+          <p className="text-slate-400 text-sm">{items.length} saved items</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="card overflow-hidden">
+              <div className="skeleton aspect-[4/3]" />
+              <div className="p-3 space-y-2">
+                <div className="skeleton h-4 w-full rounded" />
+                <div className="skeleton h-3 w-24 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-24">
+          <Heart size={64} className="text-slate-200 mx-auto mb-4" />
+          <h3 className="font-bold text-xl text-slate-600 mb-2">Your wishlist is empty</h3>
+          <p className="text-slate-400 text-sm mb-6">Tap the ❤️ on any listing to save it here</p>
+          <Link to="/" className="btn-primary">Browse Listings</Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {items.map(item => <WishCard key={item.productId} item={item} onRemove={handleRemove} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function WishCard({ item, onRemove }) {
+  const [removing, setRemoving] = useState(false)
+  const [imgErr,   setImgErr]   = useState(false)
+
+  const doRemove = async e => {
+    e.preventDefault(); e.stopPropagation()
+    if (removing) return
+    setRemoving(true)
+    await onRemove(item.productId)
+    setRemoving(false)
+  }
+
+  return (
+    <Link to={`/product/${item.productId}`} className="block group">
+      <div className="card overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+        <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+          <img
+            src={imgErr ? CATEGORY_IMAGES.default : itemImg(item)}
+            alt={item.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={() => setImgErr(true)}
+          />
+          <button onClick={doRemove} disabled={removing}
+            className="absolute top-2 right-2 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-red-500 hover:bg-red-500 hover:text-white transition-all shadow disabled:opacity-60">
+            {removing
+              ? <span className="w-3 h-3 border border-red-500 border-t-transparent rounded-full animate-spin" />
+              : <Trash2 size={13} />}
+          </button>
+        </div>
+        <div className="p-3">
+          <p className="font-bold text-slate-800 text-sm truncate">{item.title}</p>
+          <div className="flex items-center gap-1 text-slate-400 text-xs mt-1">
+            <MapPin size={11} /><span>{item.city}</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}

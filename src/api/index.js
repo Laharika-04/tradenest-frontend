@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api',
   timeout: 20000,
   headers: { 'Content-Type': 'application/json' },
 })
@@ -26,10 +26,7 @@ api.interceptors.response.use(
   }
 )
 
-// FIX: Use Vite env variable so this works in production too.
-// Set VITE_API_HOST=https://your-backend.com in .env.production
-// Falls back to localhost:9000 for local development.
-export const IMG_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:9000'
+export const IMG_HOST = import.meta.env.VITE_API_URL || 'http://localhost:9000'
 
 export const getImageUrl = (raw) => {
   if (!raw || raw === 'sample.jpg' || !raw.trim()) return null
@@ -46,19 +43,19 @@ export const getFirstImageUrl = (images) => {
 }
 
 export const CATEGORY_IMAGES = {
-  cars:         'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&q=75',
-  motorcycles:  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=75',
-  phones:       'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&q=75',
-  electronics:  'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=600&q=75',
-  furniture:    'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&q=75',
-  fashion:      'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&q=75',
-  books:        'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&q=75',
-  laptops:      'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=600&q=75',
-  pets:         'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600&q=75',
-  sports:       'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&q=75',
-  services:     'https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=600&q=75',
-  'real-estate':'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&q=75',
-  default:      'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=600&q=75',
+  cars:          'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&q=75',
+  motorcycles:   'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=75',
+  phones:        'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&q=75',
+  electronics:   'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=600&q=75',
+  furniture:     'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&q=75',
+  fashion:       'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&q=75',
+  books:         'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&q=75',
+  laptops:       'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=600&q=75',
+  pets:          'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600&q=75',
+  sports:        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&q=75',
+  services:      'https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=600&q=75',
+  'real-estate': 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&q=75',
+  default:       'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=600&q=75',
 }
 
 export const getProductImage = (product) => {
@@ -83,16 +80,16 @@ export const authAPI = {
 
 // ── Products ──────────────────────────────────────────────────────────────────
 export const productsAPI = {
-  getAll:      ()                => api.get('/products'),
+  getAll:      ()                    => api.get('/products'),
   getAllPaged:  (page = 0, size = 20) => api.get(`/products/paged?page=${page}&size=${size}`),
-  getById:     (id)              => api.get(`/products/${id}`),
-  getFeatured: ()                => api.get('/products/featured'),
-  getMy:       ()                => api.get('/products/my'),
-  getBySeller: (uid)             => api.get(`/products/seller/${uid}`),
-  create:      (d)               => api.post('/products', d),
-  update:      (id, d)           => api.put(`/products/${id}`, d),
-  markAsSold:  (id)              => api.put(`/products/${id}/sold`),
-  delete:      (id)              => api.delete(`/products/${id}`),
+  getById:     (id)                  => api.get(`/products/${id}`),
+  getFeatured: ()                    => api.get('/products/featured'),
+  getMy:       ()                    => api.get('/products/my'),
+  getBySeller: (uid)                 => api.get(`/products/seller/${uid}`),
+  create:      (d)                   => api.post('/products', d),
+  update:      (id, d)               => api.put(`/products/${id}`, d),
+  markAsSold:  (id)                  => api.put(`/products/${id}/sold`),
+  delete:      (id)                  => api.delete(`/products/${id}`),
 
   search: ({ q, city, category, minPrice, maxPrice, page = 0, size = 20 } = {}) => {
     const params = new URLSearchParams()
@@ -132,11 +129,11 @@ export const wishlistAPI = {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 export const messagesAPI = {
-  getConversations:  ()       => api.get('/messages/conversations'),
-  getMessages:       (id)     => api.get(`/messages/conversations/${id}`),
-  startConversation: (d)      => api.post('/messages/conversations', d),
-  sendMessage:       (id, d)  => api.post(`/messages/conversations/${id}`, d),
-  markRead:          (id)     => api.put(`/messages/conversations/${id}/read`),
+  getConversations:  ()      => api.get('/messages/conversations'),
+  getMessages:       (id)    => api.get(`/messages/conversations/${id}`),
+  startConversation: (d)     => api.post('/messages/conversations', d),
+  sendMessage:       (id, d) => api.post(`/messages/conversations/${id}`, d),
+  markRead:          (id)    => api.put(`/messages/conversations/${id}/read`),
 }
 
 // ── Offers ────────────────────────────────────────────────────────────────────
@@ -163,10 +160,10 @@ export const dashboardAPI = {
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 export const notificationsAPI = {
-  getAll:       ()   => api.get('/notifications'),
-  getUnread:    ()   => api.get('/notifications/unread-count'),
-  markAllRead:  ()   => api.put('/notifications/mark-all-read'),
-  markOneRead:  (id) => api.put(`/notifications/${id}/read`),
+  getAll:      ()   => api.get('/notifications'),
+  getUnread:   ()   => api.get('/notifications/unread-count'),
+  markAllRead: ()   => api.put('/notifications/mark-all-read'),
+  markOneRead: (id) => api.put(`/notifications/${id}/read`),
 }
 
 // ── File upload ───────────────────────────────────────────────────────────────
